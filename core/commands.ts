@@ -11,9 +11,13 @@ import {
   type Company,
   type Entry,
 } from './company.ts';
+import { applyCredit, convertDoc, createPurchaseDoc, createSalesDoc, createSettlement, createTransfer, voidDoc, type Doc } from './documents.ts';
+import { createItem, setItemActive, updateItem, type Item } from './items.ts';
 import { postEntry, reverseEntry } from './journal.ts';
+import { createParty, setPartyActive, updateParty, type Party, type PartyKind } from './parties.ts';
 import { err, type Result, ok } from './result.ts';
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports.ts';
+import { openInvoices, partyBalances, unpaidBills } from './subledger.ts';
 
 export interface CommandSpec {
   id: string;
@@ -103,15 +107,76 @@ const commands: CommandSpec[] = [
   },
 ];
 
+const LABELS: Record<PartyKind, { en: string; ar: string; plural: { en: string; ar: string } }> = {
+  customer: { en: 'Customer', ar: 'زبون', plural: { en: 'Customers', ar: 'الزبائن' } },
+  vendor: { en: 'Vendor', ar: 'مورّد', plural: { en: 'Vendors', ar: 'الموردون' } },
+};
+
+for (const kind of ['customer', 'vendor'] as const) {
+  const L = LABELS[kind];
+  commands.push(
+    { id: `${kind}.create`, label: { en: `New ${L.en}`, ar: `${L.ar} جديد` }, mutates: true, run: (c, p) => createParty(c, kind, p) },
+    { id: `${kind}.update`, label: { en: `Edit ${L.en}`, ar: `تعديل ${L.ar}` }, mutates: true, run: (c, p) => updateParty(c, kind, p.id, p) },
+    { id: `${kind}.setActive`, label: { en: `Make ${L.en} Active / Inactive`, ar: `تفعيل ${L.ar} أو إيقافه` }, mutates: true, run: (c, p) => setPartyActive(c, kind, p.id, p.active) },
+    {
+      id: `${kind}.list`,
+      label: L.plural,
+      mutates: false,
+      run: (c, p): Result<Party[]> => ok([...c.parties.values()].filter((x) => x.kind === kind && (p.includeInactive === true || x.active))),
+    },
+  );
+}
+
+const docList = (c: Company, p: Record<string, unknown>): Result<Doc[]> =>
+  ok([...c.documents.values()].filter((d) => (p.kind === undefined || d.kind === p.kind) && (p.partyId === undefined || d.partyId === p.partyId)));
+
+commands.push(
+  { id: 'item.create', label: { en: 'New Item', ar: 'صنف جديد' }, mutates: true, run: (c, p) => createItem(c, p) },
+  { id: 'item.update', label: { en: 'Edit Item', ar: 'تعديل الصنف' }, mutates: true, run: (c, p) => updateItem(c, p.id, p) },
+  { id: 'item.setActive', label: { en: 'Make Item Active / Inactive', ar: 'تفعيل الصنف أو إيقافه' }, mutates: true, run: (c, p) => setItemActive(c, p.id, p.active) },
+  { id: 'item.list', label: { en: 'Item List', ar: 'قائمة الأصناف' }, mutates: false, run: (c, p): Result<Item[]> => ok([...c.items.values()].filter((i) => p.includeInactive === true || i.active)) },
+  { id: 'estimate.create', label: { en: 'Create Estimate', ar: 'عرض سعر' }, mutates: true, run: (c, p) => createSalesDoc(c, 'estimate', p) },
+  { id: 'estimate.toInvoice', label: { en: 'Convert Estimate to Invoice', ar: 'تحويل عرض السعر إلى فاتورة' }, mutates: true, run: (c, p) => convertDoc(c, 'estimate', p) },
+  { id: 'invoice.create', label: { en: 'Create Invoice', ar: 'فاتورة بيع' }, mutates: true, run: (c, p) => createSalesDoc(c, 'invoice', p) },
+  { id: 'salesReceipt.create', label: { en: 'Create Sales Receipt', ar: 'إيصال بيع نقدي' }, mutates: true, run: (c, p) => createSalesDoc(c, 'sales_receipt', p) },
+  { id: 'creditMemo.create', label: { en: 'Create Credit Memo', ar: 'إشعار دائن' }, mutates: true, run: (c, p) => createSalesDoc(c, 'credit_memo', p) },
+  { id: 'payment.receive', label: { en: 'Receive Payment', ar: 'استلام دفعة' }, mutates: true, run: (c, p) => createSettlement(c, 'payment', p) },
+  { id: 'ar.apply', label: { en: 'Apply Customer Credit', ar: 'تطبيق رصيد الزبون' }, mutates: true, run: (c, p) => (isCustomerSide(c, p) ? applyCredit(c, p) : err('apply.side', 'That is not a customer payment or credit.')) },
+  { id: 'purchaseOrder.create', label: { en: 'Create Purchase Order', ar: 'أمر شراء' }, mutates: true, run: (c, p) => createPurchaseDoc(c, 'purchase_order', p) },
+  { id: 'purchaseOrder.toBill', label: { en: 'Receive Purchase Order as Bill', ar: 'استلام أمر الشراء كفاتورة' }, mutates: true, run: (c, p) => convertDoc(c, 'purchase_order', p) },
+  { id: 'bill.create', label: { en: 'Enter Bill', ar: 'فاتورة شراء' }, mutates: true, run: (c, p) => createPurchaseDoc(c, 'bill', p) },
+  { id: 'vendorCredit.create', label: { en: 'Enter Vendor Credit', ar: 'إشعار دائن من مورّد' }, mutates: true, run: (c, p) => createPurchaseDoc(c, 'vendor_credit', p) },
+  { id: 'bill.pay', label: { en: 'Pay Bills', ar: 'دفع الفواتير' }, mutates: true, run: (c, p) => createSettlement(c, 'bill_payment', p) },
+  { id: 'ap.apply', label: { en: 'Apply Vendor Credit', ar: 'تطبيق رصيد المورّد' }, mutates: true, run: (c, p) => (isCustomerSide(c, p) ? err('apply.side', 'That is not a vendor payment or credit.') : applyCredit(c, p)) },
+  { id: 'expense.create', label: { en: 'Write Check / Expense', ar: 'مصروف أو شيك' }, mutates: true, run: (c, p) => createPurchaseDoc(c, 'expense', p) },
+  { id: 'transfer.create', label: { en: 'Transfer Funds', ar: 'تحويل بين الحسابات' }, mutates: true, run: (c, p) => createTransfer(c, p) },
+  { id: 'document.void', label: { en: 'Void', ar: 'إلغاء' }, mutates: true, run: (c, p) => voidDoc(c, p) },
+  { id: 'document.list', label: { en: 'Transactions', ar: 'المعاملات' }, mutates: false, run: docList },
+  { id: 'report.customerBalances', label: { en: 'Customer Balance', ar: 'أرصدة الزبائن' }, mutates: false, run: (c, p) => partyBalances(c, 'customer', p.asOf, p.detail) },
+  { id: 'report.vendorBalances', label: { en: 'Vendor Balance', ar: 'أرصدة الموردين' }, mutates: false, run: (c, p) => partyBalances(c, 'vendor', p.asOf, p.detail) },
+  { id: 'report.openInvoices', label: { en: 'Open Invoices', ar: 'الفواتير المفتوحة' }, mutates: false, run: (c, p) => openInvoices(c, p.asOf) },
+  { id: 'report.unpaidBills', label: { en: 'Unpaid Bills', ar: 'فواتير الشراء غير المدفوعة' }, mutates: false, run: (c, p) => unpaidBills(c, p.asOf) },
+);
+
+function isCustomerSide(c: Company, p: Record<string, unknown>): boolean {
+  const d = typeof p.sourceId === 'number' ? c.documents.get(p.sourceId) : undefined;
+  return d?.kind === 'payment' || d?.kind === 'credit_memo';
+}
+
 export const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map(commands.map((c) => [c.id, c]));
 
 // Posted entries are frozen and only ever appended, so a snapshot copies the entry list, not the entries.
+// Everything else that can change in place is copied one level deep.
 function snapshot(c: Company): Company {
   return {
     ...c,
     closingDateLog: [...c.closingDateLog],
     accounts: new Map([...c.accounts].map(([id, a]) => [id, { ...a }])),
     entries: [...c.entries],
+    parties: new Map([...c.parties].map(([id, x]) => [id, { ...x }])),
+    items: new Map([...c.items].map(([id, x]) => [id, { ...x }])),
+    documents: new Map([...c.documents].map(([id, x]) => [id, { ...x }])),
+    applications: c.applications.map((a) => ({ ...a })),
   };
 }
 

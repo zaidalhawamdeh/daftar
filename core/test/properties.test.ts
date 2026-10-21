@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { normalSide } from '../accounts.ts';
 import { execute } from '../commands.ts';
 import { createCompany, type Company } from '../company.ts';
+import { createParty } from '../parties.ts';
 import { fiscalYearStart } from '../dates.ts';
 import { postEntry, reverseEntry } from '../journal.ts';
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from '../reports.ts';
@@ -30,6 +31,15 @@ function randomBooks(seed: number): { c: Company; rand: () => number; dates: str
   if (!made.ok) throw new Error(made.error.message);
   const c = made.value;
   const ids = [...c.accounts.keys()];
+  const customers = ['Ann', 'Basma'].map((name) => createParty(c, 'customer', { name }));
+  const vendors = ['Omar Supplies', 'Zain Trading'].map((name) => createParty(c, 'vendor', { name }));
+  const pick = <T>(xs: T[]) => xs[int(0, xs.length - 1)]!;
+  // Receivable and payable lines must name someone; other lines sometimes do.
+  const partyFor = (accountId: string): string | null => {
+    const t = c.accounts.get(accountId)!.type;
+    const r = t === 'accounts_receivable' ? pick(customers) : t === 'accounts_payable' ? pick(vendors) : rand() < 0.2 ? pick([...customers, ...vendors]) : null;
+    return r && r.ok ? r.value.id : null;
+  };
   const dates: string[] = [];
   const n = int(20, 120);
   for (let i = 0; i < n; i++) {
@@ -40,8 +50,12 @@ function randomBooks(seed: number): { c: Company; rand: () => number; dates: str
     const total = amounts.reduce((a, b) => a + b, 0);
     // k-1 lines on one side, one balancing line on the other; sides shuffled.
     const debitSide = rand() < 0.5;
-    const lines = amounts.map((m) => ({ accountId: ids[int(0, ids.length - 1)]!, debit: debitSide ? m : 0, credit: debitSide ? 0 : m }));
-    lines.push({ accountId: ids[int(0, ids.length - 1)]!, debit: debitSide ? 0 : total, credit: debitSide ? total : 0 });
+    const line = (debit: number, credit: number) => {
+      const accountId = ids[int(0, ids.length - 1)]!;
+      return { accountId, debit, credit, partyId: partyFor(accountId) };
+    };
+    const lines = amounts.map((m) => line(debitSide ? m : 0, debitSide ? 0 : m));
+    lines.push(line(debitSide ? 0 : total, debitSide ? total : 0));
     const r = postEntry(c, { date, memo: `random ${i}`, lines });
     if (!r.ok) throw new Error(r.error.message);
     if (rand() < 0.1) {
@@ -154,7 +168,7 @@ test('moving accounts under new parents and deactivating them never breaks roll-
 test('a refused entry never changes the books', () => {
   for (const seed of SEEDS.slice(0, 100)) {
     const { c, rand } = randomBooks(seed);
-    const ids = [...c.accounts.keys()];
+    const ids = [...c.accounts.values()].filter((a) => a.type !== 'accounts_receivable' && a.type !== 'accounts_payable').map((a) => a.id);
     const before = structuredClone(c);
     const a = ids[Math.floor(rand() * ids.length)]!;
     const b = ids[Math.floor(rand() * ids.length)]!;

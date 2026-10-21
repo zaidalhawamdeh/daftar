@@ -19,8 +19,12 @@ export function fiscalYearStart(date: string, startMonth: number): string {
   return `${m >= startMonth ? y : y - 1}-${pad(startMonth)}-01`;
 }
 
-export function dayBefore(date: string): string {
+export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  const t = new Date(Date.UTC(y, m - 1, d) - 86_400_000);
+  const t = new Date(Date.UTC(y, m - 1, d) + days * 86_400_000);
   return `${pad(t.getUTCFullYear(), 4)}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+}
+
+export function dayBefore(date: string): string {
+  return addDays(date, -1);
 }

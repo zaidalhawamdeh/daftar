@@ -5,6 +5,7 @@
 import { createCompany, createAccount, findAccount, type Company } from '../../company.ts';
 import { postEntry, reverseEntry } from '../../journal.ts';
 import { parseAmount } from '../../money.ts';
+import { createParty } from '../../parties.ts';
 
 export function bakery(): Company {
   const made = createCompany({ name: 'Golden Bakery', currency: 'JOD', template: 'none' });
@@ -33,6 +34,11 @@ export function bakery(): Company {
     if (!r.ok) throw new Error(r.error.message);
   }
 
+  const hotel = createParty(c, 'customer', { name: 'Grand Hotel', termsDays: 30 });
+  const mill = createParty(c, 'vendor', { name: 'Flour Mill', termsDays: 15 });
+  if (!hotel.ok || !mill.ok) throw new Error('parties');
+  const partyFor: Record<string, string> = { '1200': hotel.value.id, '2000': mill.value.id };
+
   const money = (s: string) => {
     const r = parseAmount(s, c.currency);
     if (!r.ok) throw new Error(r.error.message);
@@ -47,7 +53,7 @@ export function bakery(): Company {
     const r = postEntry(c, {
       date,
       memo,
-      lines: lines.map(([n, side, amt]) => ({ accountId: id(n), debit: side === 'Dr' ? money(amt) : 0, credit: side === 'Cr' ? money(amt) : 0 })),
+      lines: lines.map(([n, side, amt]) => ({ accountId: id(n), debit: side === 'Dr' ? money(amt) : 0, credit: side === 'Cr' ? money(amt) : 0, partyId: partyFor[n] ?? null })),
     });
     if (!r.ok) throw new Error(r.error.message);
     return r.value;

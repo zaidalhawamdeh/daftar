@@ -174,7 +174,7 @@
    "id": "lists.item-list-products-and-services",
    "area": "lists",
    "feature": "Item list (products and services)",
-   "command": null
+   "command": "item.list"
   },
   {
    "id": "lists.item-types-service-non-inventory-inventory-other-charge",
@@ -252,13 +252,13 @@
    "id": "customers.estimates-and-quotes",
    "area": "customers",
    "feature": "Estimates and quotes",
-   "command": null
+   "command": "estimate.create"
   },
   {
    "id": "customers.convert-estimate-to-invoice",
    "area": "customers",
    "feature": "Convert estimate to invoice",
-   "command": null
+   "command": "estimate.toInvoice"
   },
   {
    "id": "customers.progress-invoicing-from-estimates",
@@ -276,7 +276,7 @@
    "id": "customers.invoices",
    "area": "customers",
    "feature": "Invoices",
-   "command": null
+   "command": "invoice.create"
   },
   {
    "id": "customers.invoice-templates-and-print-layout",
@@ -294,7 +294,7 @@
    "id": "customers.sales-receipts-paid-on-the-spot",
    "area": "customers",
    "feature": "Sales receipts (paid on the spot)",
-   "command": null
+   "command": "salesReceipt.create"
   },
   {
    "id": "customers.statement-charges",
@@ -312,13 +312,13 @@
    "id": "customers.receive-payments",
    "area": "customers",
    "feature": "Receive payments",
-   "command": null
+   "command": "payment.receive"
   },
   {
    "id": "customers.apply-one-payment-to-several-invoices",
    "area": "customers",
    "feature": "Apply one payment to several invoices",
-   "command": null
+   "command": "payment.receive"
   },
   {
    "id": "customers.early-payment-discounts",
@@ -330,13 +330,13 @@
    "id": "customers.partial-payments",
    "area": "customers",
    "feature": "Partial payments",
-   "command": null
+   "command": "payment.receive"
   },
   {
    "id": "customers.overpayments-and-customer-credits",
    "area": "customers",
    "feature": "Overpayments and customer credits",
-   "command": null
+   "command": "ar.apply"
   },
   {
    "id": "customers.credit-memos-and-refunds",
@@ -396,49 +396,49 @@
    "id": "vendors.purchase-orders",
    "area": "vendors",
    "feature": "Purchase orders",
-   "command": null
+   "command": "purchaseOrder.create"
   },
   {
    "id": "vendors.receive-items-against-a-purchase-order",
    "area": "vendors",
    "feature": "Receive items against a purchase order",
-   "command": null
+   "command": "purchaseOrder.toBill"
   },
   {
    "id": "vendors.enter-bills",
    "area": "vendors",
    "feature": "Enter bills",
-   "command": null
+   "command": "bill.create"
   },
   {
    "id": "vendors.pay-bills",
    "area": "vendors",
    "feature": "Pay bills",
-   "command": null
+   "command": "bill.pay"
   },
   {
    "id": "vendors.partial-bill-payments",
    "area": "vendors",
    "feature": "Partial bill payments",
-   "command": null
+   "command": "bill.pay"
   },
   {
    "id": "vendors.vendor-credits",
    "area": "vendors",
    "feature": "Vendor credits",
-   "command": null
+   "command": "vendorCredit.create"
   },
   {
    "id": "vendors.bill-due-dates-and-terms",
    "area": "vendors",
    "feature": "Bill due dates and terms",
-   "command": null
+   "command": "bill.create"
   },
   {
    "id": "vendors.write-checks-and-record-expenses",
    "area": "vendors",
    "feature": "Write checks and record expenses",
-   "command": null
+   "command": "expense.create"
   },
   {
    "id": "vendors.print-checks",
@@ -480,7 +480,7 @@
    "id": "banking.transfer-funds-between-accounts",
    "area": "banking",
    "feature": "Transfer funds between accounts",
-   "command": null
+   "command": "transfer.create"
   },
   {
    "id": "banking.bank-register-with-running-balance",
@@ -558,7 +558,7 @@
    "id": "accounting.void-a-transaction",
    "area": "accounting",
    "feature": "Void a transaction",
-   "command": null
+   "command": "document.void"
   },
   {
    "id": "accounting.opening-balances",
@@ -774,25 +774,25 @@
    "id": "reports.open-invoices",
    "area": "reports",
    "feature": "Open invoices",
-   "command": null
+   "command": "report.openInvoices"
   },
   {
    "id": "reports.unpaid-bills",
    "area": "reports",
    "feature": "Unpaid bills",
-   "command": null
+   "command": "report.unpaidBills"
   },
   {
    "id": "reports.customer-balance-summary-and-detail",
    "area": "reports",
    "feature": "Customer balance summary and detail",
-   "command": null
+   "command": "report.customerBalances"
   },
   {
    "id": "reports.vendor-balance-summary-and-detail",
    "area": "reports",
    "feature": "Vendor balance summary and detail",
-   "command": null
+   "command": "report.vendorBalances"
   },
   {
    "id": "reports.sales-by-customer-and-by-item",

@@ -1,7 +1,9 @@
 // Posting. An entry is accepted only if it balances; once posted it is never edited or deleted.
 // A mistake is undone with a reversing entry, as a bookkeeper would.
 
-import type { Company, Entry, Line } from './company.ts';
+import type { AccountType } from './accounts.ts';
+import type { Company, Entry, EntrySource, Line } from './company.ts';
+import type { PartyKind } from './parties.ts';
 import { isIsoDate } from './dates.ts';
 import { formatAmount, isMinor } from './money.ts';
 import { err, ok, type Result } from './result.ts';
@@ -13,7 +15,12 @@ export interface EntryInput {
   date: unknown;
   memo?: unknown;
   lines: unknown;
+  source?: EntrySource | null;
 }
+
+// Receivable lines must name a customer and payable lines a vendor, so every balance can be traced
+// to someone and customer balances always add up to the receivables account.
+const PARTY_FOR: Partial<Record<AccountType, PartyKind>> = { accounts_receivable: 'customer', accounts_payable: 'vendor' };
 
 function memoOf(v: unknown): Result<string> {
   if (v === undefined || v === null) return ok('');
@@ -60,10 +67,22 @@ export function validateEntry(c: Company, input: EntryInput): Result<Omit<Entry,
     }
     const memo = memoOf(l.memo);
     if (!memo.ok) return memo;
+    let partyId: string | null = null;
+    if (l.partyId !== undefined && l.partyId !== null) {
+      const party = typeof l.partyId === 'string' ? c.parties.get(l.partyId) : undefined;
+      if (!party) return err('line.party_missing', `Line ${i + 1}: name does not exist.`, where);
+      partyId = party.id;
+    }
+    const needs = PARTY_FOR[account.type];
+    if (needs) {
+      const party = partyId ? c.parties.get(partyId) : undefined;
+      if (!party) return err('line.party_required', `Line ${i + 1}: "${account.name}" needs a ${needs}.`, where);
+      if (party.kind !== needs) return err('line.party_kind', `Line ${i + 1}: "${account.name}" needs a ${needs}, not a ${party.kind}.`, where);
+    }
     debits += debit;
     credits += credit;
     if (!Number.isSafeInteger(debits) || !Number.isSafeInteger(credits)) return err('amount.too_large', 'Entry total is too large.');
-    lines.push({ accountId: account.id, debit, credit, memo: memo.value });
+    lines.push({ accountId: account.id, debit, credit, memo: memo.value, partyId });
   }
   if (debits !== credits) {
     return err('entry.unbalanced', `Debits ${formatAmount(debits, c.currency)} do not equal credits ${formatAmount(credits, c.currency)}.`, {
@@ -71,7 +90,8 @@ export function validateEntry(c: Company, input: EntryInput): Result<Omit<Entry,
       credits,
     });
   }
-  return ok({ date: date.value, memo: memo.value, lines, reverses: null });
+  const source = input.source ?? null;
+  return ok({ date: date.value, memo: memo.value, lines, reverses: null, source: source ? { kind: source.kind, id: source.id } : null });
 }
 
 // Posted entries are frozen: nothing, inside or outside the core, can edit one after the fact.
@@ -119,8 +139,9 @@ export function reverseEntry(c: Company, input: ReverseInput): Result<Entry> {
     id: c.nextEntryId++,
     date: date.value,
     memo: memo.value,
-    lines: original.lines.map((l) => ({ accountId: l.accountId, debit: l.credit, credit: l.debit, memo: l.memo })),
+    lines: original.lines.map((l) => ({ accountId: l.accountId, debit: l.credit, credit: l.debit, memo: l.memo, partyId: l.partyId })),
     reverses: original.id,
+    source: original.source,
   });
   c.entries.push(entry);
   return ok(entry);

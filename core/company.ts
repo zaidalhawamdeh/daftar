@@ -6,12 +6,22 @@ import { isIsoDate } from './dates.ts';
 import { currency, type Currency, type Minor } from './money.ts';
 import { err, ok, type Result } from './result.ts';
 import { BASIC_CHART } from './templates.ts';
+import type { Application, Doc } from './documents.ts';
+import type { Item } from './items.ts';
+import type { Party } from './parties.ts';
 
 export interface Line {
   accountId: string;
   debit: Minor;
   credit: Minor;
   memo: string;
+  partyId: string | null; // required on receivable and payable lines
+}
+
+// The document an entry was posted for, if any.
+export interface EntrySource {
+  kind: string;
+  id: number;
 }
 
 export interface Entry {
@@ -20,6 +30,7 @@ export interface Entry {
   memo: string;
   lines: readonly Line[];
   reverses: number | null;
+  source: EntrySource | null;
 }
 
 export type Language = 'en' | 'ar';
@@ -33,8 +44,16 @@ export interface Company {
   closingDateLog: { from: string | null; to: string | null }[];
   accounts: Map<string, Account>;
   entries: Entry[];
+  parties: Map<string, Party>;
+  items: Map<string, Item>;
+  documents: Map<number, Doc>;
+  applications: Application[];
   nextAccountId: number;
   nextEntryId: number;
+  nextPartyId: number;
+  nextItemId: number;
+  nextDocId: number;
+  nextApplicationId: number;
 }
 
 export interface CreateCompanyInput {
@@ -47,12 +66,12 @@ export interface CreateCompanyInput {
 
 const RETAINED_EARNINGS = { en: 'Retained Earnings', ar: 'الأرباح المحتجزة' };
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+export const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function cleanName(v: unknown, max: number, what: string): Result<string> {
+export function cleanName(v: unknown, max: number, what: string): Result<string> {
   if (typeof v !== 'string') return err(`${what}.invalid`, `${what} must be text.`);
-  // Invisible characters would let "Rent" and "Rent​" sit side by side.
-  const s = v.replace(/[​-‏‪-‮⁠-⁩﻿]/g, '').trim().replace(/\s+/g, ' ');
+  // Invisible characters would let "Rent" and "Rent\u200b" sit side by side.
+  const s = v.replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').trim().replace(/\s+/g, ' ');
   if (!s) return err(`${what}.empty`, `${what} is required.`);
   if (s.length > max) return err(`${what}.too_long`, `${what} is longer than ${max} characters.`);
   return ok(s);
@@ -82,8 +101,16 @@ export function createCompany(input: CreateCompanyInput): Result<Company> {
     closingDateLog: [],
     accounts: new Map(),
     entries: [],
+    parties: new Map(),
+    items: new Map(),
+    documents: new Map(),
+    applications: [],
     nextAccountId: 1,
     nextEntryId: 1,
+    nextPartyId: 1,
+    nextItemId: 1,
+    nextDocId: 1,
+    nextApplicationId: 1,
   };
   const re = insertAccount(company, { number: '3900', name: RETAINED_EARNINGS[language], type: 'equity', parentId: null });
   re.role = 'retained_earnings';

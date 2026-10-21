@@ -58,7 +58,7 @@ test('#3 report totals beyond exact integer range are refused, not rounded', () 
   const c = fresh();
   const big = Number.MAX_SAFE_INTEGER;
   const inc = ['4000', '4100', '4900'];
-  const cash = ['1000', '1010', '1200'];
+  const cash = ['1000', '1010', '1350'];
   const amounts = [big, big, 1];
   amounts.forEach((m, i) => postEntry(c, { date: '2026-01-05', lines: [{ accountId: id(c, cash[i]!), debit: m }, { accountId: id(c, inc[i]!), credit: m }] }));
   assert.equal(code(profitAndLoss(c, '2026-01-01', '2026-12-31')), 'amount.too_large');
