@@ -8,7 +8,7 @@ import { isIsoDate } from './dates.ts';
 import { formatAmount, isMinor } from './money.ts';
 import { err, ok, type Result } from './result.ts';
 
-export const MAX_LINES = 500;
+export const MAX_LINES = 1000; // a 500-line document plus its control line fits
 const MAX_MEMO = 1000;
 
 export interface EntryInput {
@@ -19,7 +19,9 @@ export interface EntryInput {
 }
 
 // Receivable lines must name a customer and payable lines a vendor, so every balance can be traced
-// to someone and customer balances always add up to the receivables account.
+// to someone and customer balances always add up to the receivables account. They are written only by
+// documents (invoices, bills, payments, credits), so every amount owed is also an open document.
+// Opening balances are entered as invoices and bills, as QuickBooks does.
 const PARTY_FOR: Partial<Record<AccountType, PartyKind>> = { accounts_receivable: 'customer', accounts_payable: 'vendor' };
 
 function memoOf(v: unknown): Result<string> {
@@ -74,6 +76,9 @@ export function validateEntry(c: Company, input: EntryInput): Result<Omit<Entry,
       partyId = party.id;
     }
     const needs = PARTY_FOR[account.type];
+    if (needs && !input.source) {
+      return err('line.control_needs_document', `Line ${i + 1}: "${account.name}" changes through invoices, bills, payments and credits, not journal entries.`, where);
+    }
     if (needs) {
       const party = partyId ? c.parties.get(partyId) : undefined;
       if (!party) return err('line.party_required', `Line ${i + 1}: "${account.name}" needs a ${needs}.`, where);
@@ -119,10 +124,15 @@ export interface ReverseInput {
   memo?: unknown;
 }
 
-export function reverseEntry(c: Company, input: ReverseInput): Result<Entry> {
+// An entry that belongs to a document is undone by voiding the document, which keeps the document
+// and its entry in step; only `voidDoc` passes `forDocument`.
+export function reverseEntry(c: Company, input: ReverseInput, opts: { forDocument?: boolean } = {}): Result<Entry> {
   if (typeof input !== 'object' || input === null) return err('entry.invalid', 'Reversal details are missing.');
   const original = c.entries.find((e) => e.id === input.entryId);
   if (!original) return err('entry.missing', 'Entry does not exist.');
+  if (original.source && !opts.forDocument) {
+    return err('entry.has_document', `Entry ${original.id} belongs to a ${original.source.kind.replace('_', ' ')}; void the document instead.`);
+  }
   const existing = reversalOf(c, original.id);
   if (existing) return err('entry.already_reversed', `Entry ${original.id} is already reversed by entry ${existing.id}.`);
   if (original.reverses !== null) return err('entry.is_reversal', `Entry ${original.id} is itself a reversal; post a new entry instead.`);

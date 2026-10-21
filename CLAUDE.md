@@ -18,6 +18,9 @@ People will run real businesses on this. A wrong number is worse than a missing 
 - **Every report agrees with every other at every date.** The general ledger restarts income and
   expense accounts each fiscal year and shows each closed year's profit on Retained Earnings, so
   its closing balances equal the trial balance (property-tested).
+- **Receivables and payables move only through documents** (invoices, bills, payments, credits).
+  A plain journal entry cannot touch them, and a document's entry is undone only by voiding the
+  document. So A/R = customer balances = open invoices − unapplied credits at every date (fuzzed).
 - **Sums are checked.** A total beyond exact integer range is refused (`amount.too_large`), never rounded.
 - **Golden books:** `core/test/golden/` holds companies computed by hand. Every report must match
   them to the minor unit. A change that moves a golden number is a bug until proven otherwise.

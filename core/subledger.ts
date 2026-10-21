@@ -5,7 +5,7 @@
 import type { Company } from './company.ts';
 import { isIsoDate } from './dates.ts';
 import { openBalance, unapplied, type Doc } from './documents.ts';
-import type { Minor } from './money.ts';
+import { sum, type Minor } from './money.ts';
 import type { PartyKind } from './parties.ts';
 import { err, ok, type Result } from './result.ts';
 
@@ -64,8 +64,9 @@ export function partyBalances(c: Company, kind: PartyKind, asOf: unknown, detail
   }
   const rows = [...map.values()].filter((r) => r.balance !== 0 || detail === true).sort((a, b) => a.name.localeCompare(b.name));
   for (const r of rows) if (Object.is(r.balance, -0)) r.balance = 0;
-  const total = rows.reduce((t, r) => t + r.balance, 0);
-  return ok({ asOf, rows, total });
+  const total = sum(rows.map((r) => r.balance));
+  if (!total.ok) return total;
+  return ok({ asOf, rows, total: total.value });
 }
 
 export interface OpenDoc {
@@ -95,7 +96,9 @@ function openDocs(c: Company, kind: 'invoice' | 'bill', asOf: unknown): Result<O
     rows.push({ docId: d.id, number: d.number, partyId: d.partyId!, name: c.parties.get(d.partyId!)?.name ?? '', date: d.date, dueDate: d.dueDate ?? d.date, total: d.total, open });
   }
   rows.sort((a, b) => a.name.localeCompare(b.name) || (a.date < b.date ? -1 : a.date > b.date ? 1 : a.docId - b.docId));
-  return ok({ asOf, rows, total: rows.reduce((t, r) => t + r.open, 0) });
+  const total = sum(rows.map((r) => r.open));
+  if (!total.ok) return total;
+  return ok({ asOf, rows, total: total.value });
 }
 
 export const openInvoices = (c: Company, asOf: unknown) => openDocs(c, 'invoice', asOf);

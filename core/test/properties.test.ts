@@ -30,7 +30,8 @@ function randomBooks(seed: number): { c: Company; rand: () => number; dates: str
   const made = createCompany({ name: `Random ${seed}`, currency: rand() < 0.5 ? 'JOD' : 'USD', fiscalYearStartMonth: int(1, 12) });
   if (!made.ok) throw new Error(made.error.message);
   const c = made.value;
-  const ids = [...c.accounts.keys()];
+  // Receivables and payables move only through documents; the journal fuzz leaves them out.
+  const ids = [...c.accounts.values()].filter((a) => a.type !== 'accounts_receivable' && a.type !== 'accounts_payable').map((a) => a.id);
   const customers = ['Ann', 'Basma'].map((name) => createParty(c, 'customer', { name }));
   const vendors = ['Omar Supplies', 'Zain Trading'].map((name) => createParty(c, 'vendor', { name }));
   const pick = <T>(xs: T[]) => xs[int(0, xs.length - 1)]!;

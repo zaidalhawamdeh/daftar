@@ -3,6 +3,7 @@
 // If a report disagrees with this file, the report is wrong until proven otherwise.
 
 import { createCompany, createAccount, findAccount, type Company } from '../../company.ts';
+import { createPurchaseDoc, createSalesDoc, createSettlement } from '../../documents.ts';
 import { postEntry, reverseEntry } from '../../journal.ts';
 import { parseAmount } from '../../money.ts';
 import { createParty } from '../../parties.ts';
@@ -37,7 +38,8 @@ export function bakery(): Company {
   const hotel = createParty(c, 'customer', { name: 'Grand Hotel', termsDays: 30 });
   const mill = createParty(c, 'vendor', { name: 'Flour Mill', termsDays: 15 });
   if (!hotel.ok || !mill.ok) throw new Error('parties');
-  const partyFor: Record<string, string> = { '1200': hotel.value.id, '2000': mill.value.id };
+  const H = hotel.value.id;
+  const M = mill.value.id;
 
   const money = (s: string) => {
     const r = parseAmount(s, c.currency);
@@ -53,25 +55,32 @@ export function bakery(): Company {
     const r = postEntry(c, {
       date,
       memo,
-      lines: lines.map(([n, side, amt]) => ({ accountId: id(n), debit: side === 'Dr' ? money(amt) : 0, credit: side === 'Cr' ? money(amt) : 0, partyId: partyFor[n] ?? null })),
+      lines: lines.map(([n, side, amt]) => ({ accountId: id(n), debit: side === 'Dr' ? money(amt) : 0, credit: side === 'Cr' ? money(amt) : 0 })),
     });
     if (!r.ok) throw new Error(r.error.message);
     return r.value;
   };
+  // Receivables and payables move only through documents.
+  const must = <T>(r: { ok: true; value: T } | { ok: false; error: { message: string } }): T => {
+    if (!r.ok) throw new Error(r.error.message);
+    return r.value;
+  };
+  const bill = (date: string, memo: string, account: string, amt: string) =>
+    must(createPurchaseDoc(c, 'bill', { vendorId: M, date, memo, lines: [{ accountId: id(account), amount: money(amt) }] }));
 
   // ---- fiscal year 2025
   post('2025-12-01', 'Owner invests', [['1100', 'Dr', '20,000.000'], ['3000', 'Cr', '20,000.000']]);
   post('2025-12-05', 'Oven and mixer', [['1500', 'Dr', '8,500.000'], ['1100', 'Cr', '8,500.000']]);
   post('2025-12-15', 'Cash sales', [['1000', 'Dr', '2,340.750'], ['4000', 'Cr', '2,340.750']]);
-  post('2025-12-20', 'Flour on credit', [['5000', 'Dr', '910.250'], ['2000', 'Cr', '910.250']]);
+  const flour1 = bill('2025-12-20', 'Flour on credit', '5000', '910.250');
   post('2025-12-31', 'December rent', [['6000', 'Dr', '650.000'], ['1100', 'Cr', '650.000']]);
   // ---- fiscal year 2026
   post('2026-01-03', 'Loan received', [['1100', 'Dr', '5,000.000'], ['2500', 'Cr', '5,000.000']]);
-  post('2026-01-10', 'Hotel order on credit', [['1200', 'Dr', '3,125.125'], ['4000', 'Cr', '3,125.125']]);
+  const order = must(createSalesDoc(c, 'invoice', { customerId: H, date: '2026-01-10', memo: 'Hotel order on credit', lines: [{ accountId: id('4000'), amount: money('3,125.125') }] }));
   post('2026-01-12', 'Cash sales', [['1000', 'Dr', '1,480.500'], ['4000', 'Cr', '1,480.500']]);
-  post('2026-01-15', 'Pay flour supplier', [['2000', 'Dr', '910.250'], ['1100', 'Cr', '910.250']]);
-  post('2026-01-18', 'Flour on credit', [['5000', 'Dr', '1,204.875'], ['2000', 'Cr', '1,204.875']]);
-  post('2026-01-20', 'Hotel pays part', [['1100', 'Dr', '2,000.000'], ['1200', 'Cr', '2,000.000']]);
+  must(createSettlement(c, 'bill_payment', { vendorId: M, date: '2026-01-15', memo: 'Pay flour supplier', amount: money('910.250'), payFromId: id('1100'), applications: [{ docId: flour1.id, amount: money('910.250') }] }));
+  bill('2026-01-18', 'Flour on credit', '5000', '1,204.875');
+  must(createSettlement(c, 'payment', { customerId: H, date: '2026-01-20', memo: 'Hotel pays part', amount: money('2,000.000'), depositToId: id('1100'), applications: [{ docId: order.id, amount: money('2,000.000') }] }));
   const wrong = post('2026-01-22', 'Rent typed twice by mistake', [['6000', 'Dr', '999.000'], ['1000', 'Cr', '999.000']]);
   const rev = reverseEntry(c, { entryId: wrong.id, date: '2026-01-23' });
   if (!rev.ok) throw new Error(rev.error.message);

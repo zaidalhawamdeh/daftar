@@ -50,13 +50,14 @@ test('names are unique across customers and vendors; items need the right kind o
   assert.equal(code(exec(c, 'item.create', { name: 'consulting', salesAccountId: acct('4000') })), 'item.name_taken');
 });
 
-test('receivable and payable journal lines must name the right kind of party', () => {
+test('receivables and payables move only through documents, each line naming the right kind of party', () => {
   const { c, acct, cust, vend } = setup();
   const lines = (partyId: string | undefined) => [{ accountId: acct('1200'), debit: 100, partyId }, { accountId: acct('4000'), credit: 100 }];
-  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines(undefined) })), 'line.party_required');
-  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines(vend) })), 'line.party_kind');
-  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines('nobody') })), 'line.party_missing');
-  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines(cust) })), 'ok');
+  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines(cust) })), 'line.control_needs_document', 'no plain journal entry to A/R');
+  const source = { kind: 'invoice', id: 999 };
+  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines(undefined), source })), 'line.party_required');
+  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines(vend), source })), 'line.party_kind');
+  assert.equal(code(postEntry(c, { date: '2026-01-05', lines: lines('nobody'), source })), 'line.party_missing');
 });
 
 test('documents refuse bad parties, lines and totals, and change nothing when they do', () => {

@@ -137,8 +137,9 @@ function numberOf(c: Company, kind: DocKind, v: unknown, partyId: string | null)
   const same = [...c.documents.values()].filter((d) => d.kind === kind);
   if (v === undefined || v === null || v === '') {
     if (!SELF_NUMBERED.has(kind)) return ok('');
-    const max = same.reduce((m, d) => (/^\d{1,15}$/.test(d.number) ? Math.max(m, Number(d.number)) : m), 0);
-    return ok(String(max + 1));
+    let next = same.reduce((m, d) => (/^\d{1,15}$/.test(d.number) ? Math.max(m, Number(d.number)) : m), 0) + 1;
+    while (same.some((d) => d.number === String(next))) next++;
+    return ok(String(next));
   }
   if (typeof v !== 'string' || !v.trim() || v.trim().length > 30) return err('doc.number_invalid', 'Number is text up to 30 characters.');
   const n = v.trim();
@@ -419,6 +420,7 @@ export function applyCredit(c: Company, input: unknown): Result<Application[]> {
   const date = input.date === undefined ? ok(source.date) : isIsoDate(input.date) ? ok(input.date) : err<string>('date.invalid', 'Date must be a real date (YYYY-MM-DD).');
   if (!date.ok) return date;
   if (date.value < source.date) return err('apply.before_source', 'An application cannot be dated before the payment or credit.');
+  if (c.closingDate && date.value <= c.closingDate) return err('date.closed', `The books are closed through ${c.closingDate}.`);
   const apps = checkApplications(c, { kind: source.kind, partyId: source.partyId, accountId: source.accountId, date: date.value, available: unapplied(c, source) }, input.applications);
   if (!apps.ok) return apps;
   if (!apps.value.length) return err('apply.empty', 'Nothing to apply.');
@@ -456,6 +458,7 @@ export function convertDoc(c: Company, from: 'estimate' | 'purchase_order', inpu
   if (!src || src.kind !== from) return err('doc.missing', `That ${from.replace('_', ' ')} does not exist.`);
   if (src.voided) return err('doc.void', `${from.replace('_', ' ')} ${src.number} is void.`);
   if (src.status !== 'open') return err('doc.closed', `${from.replace('_', ' ')} ${src.number} is already closed.`);
+  // Item lines post to the item's account as it is set up today, as they would on a new invoice.
   const lines = src.lines.map((l) => ({ itemId: l.itemId, accountId: l.itemId ? undefined : l.accountId, description: l.description, quantity: formatQuantity(l.quantity), rate: l.rate }));
   const common = { date: input.date ?? src.date, number: input.number, dueDate: input.dueDate, memo: input.memo ?? src.memo, lines };
   const made =
@@ -480,7 +483,7 @@ export function voidDoc(c: Company, input: unknown): Result<Doc> {
     return err('doc.converted', 'It has been converted; void the document it became first.');
   }
   if (doc.entryId !== null) {
-    const r = reverseEntry(c, { entryId: doc.entryId, date: doc.date, memo: `Void ${doc.kind.replace('_', ' ')} ${doc.number}`.trim() });
+    const r = reverseEntry(c, { entryId: doc.entryId, date: doc.date, memo: `Void ${doc.kind.replace('_', ' ')} ${doc.number}`.trim() }, { forDocument: true });
     if (!r.ok) return r;
   }
   doc.voided = true;
