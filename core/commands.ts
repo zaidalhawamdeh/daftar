@@ -21,6 +21,8 @@ import { createParty, setPartyActive, updateParty, type Party, type PartyKind } 
 import { err, type Result, ok } from './result.ts';
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports.ts';
 import { aging, openInvoices, partyBalances, unpaidBills } from './subledger.ts';
+import { exportIif, importIif } from './import/iif.ts';
+import { importList, importOpeningBalances } from './import/opening.ts';
 
 export interface CommandSpec {
   id: string;
@@ -183,6 +185,13 @@ commands.push(
   { id: 'memorized.runDue', label: { en: 'Enter Scheduled Transactions', ar: 'إدخال المعاملات المستحقة' }, mutates: true, run: (c, p) => runDue(c, runner(c), p) },
   { id: 'memorized.setActive', label: { en: 'Pause / Resume Schedule', ar: 'إيقاف الجدولة أو استئنافها' }, mutates: true, run: (c, p) => setMemorizedActive(c, p) },
   { id: 'memorized.delete', label: { en: 'Delete Memorized Transaction', ar: 'حذف المعاملة المحفوظة' }, mutates: true, run: (c, p) => deleteMemorized(c, p) },
+);
+
+commands.push(
+  { id: 'import.iif', label: { en: 'Import QuickBooks IIF File', ar: 'استيراد ملف IIF من QuickBooks' }, mutates: true, run: (c, p) => importIif(c, p.text, { autoApply: p.autoApply !== false }) },
+  { id: 'import.openingBalances', label: { en: 'Import Opening Balances (CSV)', ar: 'استيراد الأرصدة الافتتاحية (CSV)' }, mutates: true, run: (c, p) => importOpeningBalances(c, { date: p.date, trialBalance: p.trialBalance, openInvoices: p.openInvoices, unpaidBills: p.unpaidBills }) },
+  { id: 'import.list', label: { en: 'Import List (CSV)', ar: 'استيراد قائمة (CSV)' }, mutates: true, run: (c, p) => importList(c, { kind: p.kind, text: p.text }) },
+  { id: 'export.iif', label: { en: 'Export to IIF File', ar: 'تصدير إلى ملف IIF' }, mutates: false, run: (c): Result<string> => ok(exportIif(c)) },
 );
 
 function isCustomerSide(c: Company, p: Record<string, unknown>): boolean {

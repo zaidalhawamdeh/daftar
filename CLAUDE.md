@@ -44,10 +44,10 @@ People will run real businesses on this. A wrong number is worse than a missing 
 | Layer | Folder | Job |
 |---|---|---|
 | core | `core/` | money, accounts, journal, documents, reports. Pure TypeScript, no UI, no I/O |
-| store | `store/` | SQLite company file, migrations, backups |
+| store | `store/` | company file (JSON) save/load; every load must pass `core/integrity.ts` |
 | commands | `core/commands/` | every user action is a named command with typed params |
 | app | `app/` | UI (web; same build runs in the browser and in the desktop shell) |
-| import | `import/` | QuickBooks IIF/Excel, Frappe Books file |
+| import | `core/import/` | QuickBooks IIF in and out, opening balances and lists from CSV |
 | catalog | `catalog/` | QuickBooks Desktop feature list mapped to command ids → parity number |
 
 - **Everything is a command.** Buttons, menus, CLI and tests all dispatch by command id.

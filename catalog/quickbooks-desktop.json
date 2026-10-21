@@ -234,7 +234,7 @@
    "id": "lists.import-lists-from-excel-or-csv",
    "area": "lists",
    "feature": "Import lists from Excel or CSV",
-   "command": null
+   "command": "import.list"
   },
   {
    "id": "customers.customer-center-list-balances-history",
@@ -564,7 +564,7 @@
    "id": "accounting.opening-balances",
    "area": "accounting",
    "feature": "Opening balances",
-   "command": null
+   "command": "import.openingBalances"
   },
   {
    "id": "accounting.automatic-retained-earnings-at-year-end",
@@ -876,19 +876,19 @@
    "id": "data.export-lists-and-transactions-iif",
    "area": "data",
    "feature": "Export lists and transactions (IIF)",
-   "command": null
+   "command": "export.iif"
   },
   {
    "id": "data.import-iif-file",
    "area": "data",
    "feature": "Import IIF file",
-   "command": null
+   "command": "import.iif"
   },
   {
    "id": "data.import-from-quickbooks-exports-excel-csv",
    "area": "data",
    "feature": "Import from QuickBooks exports (Excel, CSV)",
-   "command": null
+   "command": "import.openingBalances"
   },
   {
    "id": "data.search-all-transactions",

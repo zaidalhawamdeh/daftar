@@ -17,9 +17,10 @@ export type ScreenId =
   | 'reconcile'
   | 'reports'
   | 'memorized'
-  | 'settings';
+  | 'settings'
+  | 'import';
 
-export const SCREENS: readonly ScreenId[] = ['home', 'accounts', 'customers', 'vendors', 'items', 'docs', 'sales-form', 'purchase-form', 'settle-form', 'apply-credit', 'transfer', 'journal', 'reconcile', 'reports', 'memorized', 'settings'];
+export const SCREENS: readonly ScreenId[] = ['home', 'accounts', 'customers', 'vendors', 'items', 'docs', 'sales-form', 'purchase-form', 'settle-form', 'apply-credit', 'transfer', 'journal', 'reconcile', 'reports', 'memorized', 'settings', 'import'];
 
 export interface Target {
   screen: ScreenId;
@@ -88,6 +89,10 @@ export const COMMAND_SCREENS: Record<string, Target> = {
   'memorized.runDue': { screen: 'memorized' },
   'memorized.setActive': { screen: 'memorized' },
   'memorized.delete': { screen: 'memorized' },
+  'import.iif': { screen: 'import' },
+  'import.openingBalances': { screen: 'import' },
+  'import.list': { screen: 'import' },
+  'export.iif': { screen: 'settings' },
 };
 
 export const REPORTS = [
@@ -148,6 +153,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
       { label: 'Items', target: { screen: 'items' } },
       { label: 'Journal entries', target: { screen: 'journal' } },
       { label: 'Memorized transactions', target: { screen: 'memorized' } },
+      { label: 'Import', target: { screen: 'import' } },
       { label: 'Settings', target: { screen: 'settings' } },
     ],
   },

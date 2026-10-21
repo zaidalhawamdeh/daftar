@@ -33,6 +33,15 @@ export function Settings({ c }: { c: Company }) {
     a.click();
     URL.revokeObjectURL(a.href);
   };
+  const exportIif = () => {
+    const r = run<string>('export.iif');
+    if (!r.ok) return out.fail(r.error);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([r.value], { type: 'text/plain' }));
+    a.download = `${c.name.replace(/[\/:*?"<>|]+/g, '_')}.iif`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
   const restore = async (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -71,6 +80,7 @@ export function Settings({ c }: { c: Company }) {
       <h2>{t('Backup')}</h2>
       <div class="card row">
         <button onClick={download}>{t('Download backup file')}</button>
+        <button onClick={exportIif}>{t('Export to QuickBooks (IIF)')}</button>
         <label class="btn">
           {t('Open a backup file as a new company')}
           <input type="file" accept=".daftar,application/json" hidden onChange={restore} />

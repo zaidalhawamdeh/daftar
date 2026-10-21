@@ -167,6 +167,13 @@ export function run<T = unknown>(id: string, params: Record<string, unknown> = {
   return r;
 }
 
+// Run a command on a copy of the books to see what it would do. Nothing is changed or saved.
+export function preview<T = unknown>(id: string, params: Record<string, unknown> = {}): Result<T> {
+  const c = state.company;
+  if (!c) return { ok: false, error: { code: 'company.none', message: 'No company is open.' } };
+  return execute(structuredClone(c), id, params) as Result<T>;
+}
+
 export async function openCompany(c: Company, id = `c-${Date.now().toString(36)}`): Promise<void> {
   await writePending();
   state.company = c;

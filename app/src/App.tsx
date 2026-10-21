@@ -18,6 +18,7 @@ import { Settings } from './screens/Settings.tsx';
 import { Settle } from './screens/Settle.tsx';
 import { Transfer } from './screens/Transfer.tsx';
 import { Welcome } from './screens/Welcome.tsx';
+import { Import } from './screens/Import.tsx';
 
 export function App() {
   const s = useApp();
@@ -57,6 +58,7 @@ export function App() {
       case 'reports': return <Reports c={c} report={(p.report as string) ?? 'profitAndLoss'} />;
       case 'memorized': return <Memorized c={c} />;
       case 'settings': return <Settings c={c} />;
+      case 'import': return <Import c={c} />;
       default: return <Home c={c} />;
     }
   })();
