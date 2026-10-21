@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 // node scripts/screenshots.ts   rebuilds docs/images/*.png from the built app (run `npm run build` first).
 // Uses the Edge already installed on Windows through playwright-core; no browser is downloaded.
 
