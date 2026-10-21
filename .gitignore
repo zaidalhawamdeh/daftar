@@ -2,3 +2,4 @@ node_modules/
 *.daftar
 *.log
 .claude/settings.local.json
+dist/

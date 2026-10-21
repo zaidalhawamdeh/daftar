@@ -17,5 +17,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["core", "catalog", "scripts"]
+  "include": ["core", "catalog", "scripts", "store"]
 }

@@ -9,13 +9,20 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test \"core/**/*.test.ts\" \"catalog/**/*.test.ts\"",
-    "typecheck": "tsc -p .",
+    "test": "node --test \"core/**/*.test.ts\" \"catalog/**/*.test.ts\" \"store/**/*.test.ts\" \"app/**/*.test.ts\"",
+    "typecheck": "tsc -p . && tsc -p app",
     "parity": "node scripts/parity.ts",
-    "check": "npm run typecheck && npm test && node scripts/parity.ts --check"
+    "check": "npm run typecheck && npm test && node scripts/parity.ts --check",
+    "dev": "vite app",
+    "build": "vite build app"
   },
   "devDependencies": {
+    "@preact/preset-vite": "2.10.6",
     "@types/node": "^24.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "6.4.5"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
   }
 }
