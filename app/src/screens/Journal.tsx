@@ -3,7 +3,7 @@ import type { Company } from '../../../core/company.ts';
 import { reversalOf } from '../../../core/journal.ts';
 import { t } from '../i18n.ts';
 import { run } from '../state.ts';
-import { AccountSelect, AmountInput, DateInput, Field, Money, ProblemBox, parseMoney, today, useOutcome } from '../ui.tsx';
+import { AccountSelect, AmountInput, DateInput, Field, Money, ProblemBox, badAmount, parseMoney, today, useOutcome } from '../ui.tsx';
 
 interface Row {
   accountId: string;
@@ -22,6 +22,9 @@ export function Journal({ c }: { c: Company }) {
   const debits = rows.reduce((s, r) => s + (parseMoney(c, r.debit) ?? 0), 0);
   const credits = rows.reduce((s, r) => s + (parseMoney(c, r.credit) ?? 0), 0);
   const save = () => {
+    const bad = badAmount(c, ...rows.flatMap((r) => [r.debit, r.credit]));
+    if (bad) return out.fail(bad);
+    if (rows.some((r) => !r.accountId && (r.debit.trim() || r.credit.trim()))) return out.fail({ code: 'line.account_missing', message: 'Choose an account on every line that has an amount.' });
     const lines = rows.filter((r) => r.accountId).map((r) => ({ accountId: r.accountId, debit: parseMoney(c, r.debit) ?? 0, credit: parseMoney(c, r.credit) ?? 0, memo: r.memo }));
     const r = run('journal.post', { date, memo, lines });
     if (!r.ok) return out.fail(r.error);

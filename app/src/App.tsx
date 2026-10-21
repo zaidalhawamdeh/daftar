@@ -50,7 +50,7 @@ export function App() {
       case 'sales-form':
       case 'purchase-form': return <DocForm key={String(p.kind) + String(p.partyId ?? "")} c={c} kind={p.kind as never} partyId={p.partyId as string | undefined} />;
       case 'settle-form': return <Settle key={String(p.kind)} c={c} kind={(p.kind as 'payment' | 'bill_payment') ?? 'payment'} />;
-      case 'apply-credit': return <ApplyCredit c={c} side={(p.side as 'customer' | 'vendor') ?? 'customer'} sourceId={p.sourceId as number | undefined} />;
+      case 'apply-credit': return <ApplyCredit key={`${String(p.side)}-${String(p.sourceId)}`} c={c} side={(p.side as 'customer' | 'vendor') ?? 'customer'} sourceId={p.sourceId as number | undefined} />;
       case 'transfer': return <Transfer c={c} />;
       case 'journal': return <Journal c={c} />;
       case 'reconcile': return <Reconcile c={c} />;
@@ -81,7 +81,7 @@ export function App() {
       </nav>
       <main class="main">
         <div class="topbar">
-          <span class="saved" aria-live="polite">{s.saving ? t('Saving…') : t('Saved')}</span>
+          <span class="saved" aria-live="polite">{s.saveError ? <span class="neg">{t('Not saved')}: {s.saveError}</span> : s.saving ? t('Saving…') : t('Saved')}</span>
           <div class="tools">
             <button class="small" onClick={() => setPalette(true)} title="Ctrl+K">
               {t('Search commands…')} <kbd>Ctrl K</kbd>
@@ -95,6 +95,12 @@ export function App() {
             <button class="small" onClick={closeCompany}>{t('Close company')}</button>
           </div>
         </div>
+        {s.elsewhere && (
+          <div class="problem" role="alert">
+            {t('This company was changed in another tab. Reload to continue here.')}{' '}
+            <button class="small" onClick={() => location.reload()}>{t('Reload')}</button>
+          </div>
+        )}
         {screen}
       </main>
       {palette && <Palette onClose={() => setPalette(false)} />}

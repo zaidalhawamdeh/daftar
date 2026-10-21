@@ -10,7 +10,17 @@ import type { Party, PartyKind } from '../../core/parties.ts';
 import type { Problem } from '../../core/result.ts';
 import { problemText, t } from './i18n.ts';
 
-export const today = () => new Date().toISOString().slice(0, 10);
+// The person's own calendar day: in Amman at 01:30 on 1 April it is 1 April, not UTC's 31 March.
+export const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// Amount fields that hold something other than an amount stop the save, never become zero.
+export function badAmount(c: Company, ...texts: string[]): Problem | null {
+  for (const text of texts) if (text.trim() && parseMoney(c, text) === null) return { code: 'amount.invalid', message: `"${text}" is not an amount.` };
+  return null;
+}
 
 export function Money({ c, value, blankZero = false }: { c: Company; value: Minor; blankZero?: boolean }) {
   if (blankZero && value === 0) return <span />;

@@ -49,6 +49,41 @@ export async function save(rec: Stored): Promise<void> {
   db.close();
 }
 
+export interface Backup {
+  key: number;
+  savedAt: string;
+}
+
+// Earlier versions of one company, newest first.
+export async function listBackups(id: string): Promise<Backup[]> {
+  const db = await open();
+  const store = db.transaction(BACKUPS).objectStore(BACKUPS);
+  const out: Backup[] = [];
+  await new Promise<void>((resolve, reject) => {
+    const req = store.index('company').openCursor(IDBKeyRange.only(id));
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return resolve();
+      out.push({ key: cur.primaryKey as number, savedAt: (cur.value as Stored).savedAt });
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return out.reverse();
+}
+
+export async function loadBackup(key: number): Promise<Stored | undefined> {
+  const db = await open();
+  const req = db.transaction(BACKUPS).objectStore(BACKUPS).get(key);
+  const rec = await new Promise<Stored | undefined>((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result as Stored | undefined);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return rec;
+}
+
 export async function list(): Promise<Omit<Stored, 'text'>[]> {
   const db = await open();
   const req = db.transaction(COMPANIES).objectStore(COMPANIES).getAll();

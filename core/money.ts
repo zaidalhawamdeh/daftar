@@ -48,7 +48,7 @@ export function sum(values: readonly Minor[]): Result<Minor> {
 
 const LOCAL_DIGITS = ['٠١٢٣٤٥٦٧٨٩', '۰۱۲۳۴۵۶۷۸۹'];
 
-function westernDigits(s: string): string {
+export function westernDigits(s: string): string {
   let out = '';
   for (const ch of s) {
     let mapped = ch;

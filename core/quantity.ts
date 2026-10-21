@@ -2,7 +2,7 @@
 // A line amount is quantity × rate, rounded half away from zero to the currency's minor unit,
 // computed with BigInt so no step is ever approximate.
 
-import type { Minor } from './money.ts';
+import { westernDigits, type Minor } from './money.ts';
 import { err, ok, type Result } from './result.ts';
 
 export type Milli = number;
@@ -10,7 +10,7 @@ export const ONE: Milli = 1000;
 const MAX_QTY: Milli = 1_000_000_000_000; // a billion units
 
 export function parseQuantity(v: unknown): Result<Milli> {
-  const s = typeof v === 'number' ? (Number.isFinite(v) ? String(v) : '') : typeof v === 'string' ? v.trim() : '';
+  const s = typeof v === 'number' ? (Number.isFinite(v) ? String(v) : '') : typeof v === 'string' ? westernDigits(v.trim()).replace(/٫/g, '.') : '';
   if (!/^\d+(\.\d{1,3})?$/.test(s)) return err('quantity.invalid', 'Quantity is a positive number with up to 3 decimals.', { quantity: v });
   const [i = '0', f = ''] = s.split('.');
   const n = Number(i) * 1000 + Number(f.padEnd(3, '0'));

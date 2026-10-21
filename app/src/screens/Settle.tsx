@@ -7,7 +7,7 @@ import { formatAmount } from '../../../core/money.ts';
 import { t } from '../i18n.ts';
 import { docName } from '../labels.ts';
 import { go, run } from '../state.ts';
-import { AccountSelect, AmountInput, DateInput, Field, Money, PartySelect, ProblemBox, parseMoney, today, useOutcome } from '../ui.tsx';
+import { AccountSelect, AmountInput, DateInput, Field, Money, PartySelect, ProblemBox, badAmount, parseMoney, today, useOutcome } from '../ui.tsx';
 
 export function Settle({ c, kind }: { c: Company; kind: 'payment' | 'bill_payment' }) {
   const customer = kind === 'payment';
@@ -33,6 +33,8 @@ export function Settle({ c, kind }: { c: Company; kind: 'payment' | 'bill_paymen
     setApplied(next);
   };
   const save = () => {
+    const bad = badAmount(c, amount, ...Object.values(applied));
+    if (bad) return out.fail(bad);
     const total = amount.trim() ? parseMoney(c, amount) : appliedTotal;
     if (total === null) return out.fail({ code: 'amount.invalid', message: `"${amount}" is not an amount.` });
     const applications = Object.entries(applied).map(([id, v]) => ({ docId: Number(id), amount: parseMoney(c, v) })).filter((a) => a.amount);

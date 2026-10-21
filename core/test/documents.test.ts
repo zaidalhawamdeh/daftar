@@ -6,6 +6,7 @@ import { postEntry } from '../journal.ts';
 import { lineAmount, parseQuantity } from '../quantity.ts';
 import { aging, openInvoices, partyBalances, unappliedCredits, unpaidBills } from '../subledger.ts';
 import { cashFlow } from '../cashflow.ts';
+import { checkIntegrity } from '../integrity.ts';
 import { trialBalance } from '../reports.ts';
 
 type R = { ok: boolean; value?: unknown; error?: { code: string } };
@@ -228,6 +229,7 @@ test('random documents: A/R and A/P tie to party balances and to open documents 
       assert.equal(apg.value.total, apNet, `seed ${seed} ${asOf}: A/P aging = A/P`);
       const cf = cashFlow(c, '2026-02-01', asOf);
       assert.ok(cf.ok, `seed ${seed}: cash flow reconciles`);
+      assert.deepEqual(checkIntegrity(c), { ok: true, value: true }, `seed ${seed}: a company built by commands passes the integrity check`);
       for (const d of c.documents.values()) assert.ok(d.voided || (d.kind !== 'invoice' && d.kind !== 'bill') || (oi.value.rows.concat(ub.value.rows).find((r) => r.docId === d.id)?.open ?? 0) >= 0);
     }
   }

@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { ClearableLine } from '../../../core/banking.ts';
+import type { ClearableLine, ReconciliationReport } from '../../../core/banking.ts';
 import type { Company } from '../../../core/company.ts';
 import { t } from '../i18n.ts';
 import { docName } from '../labels.ts';
@@ -12,6 +12,7 @@ export function Reconcile({ c }: { c: Company }) {
   const [statementDate, setStatementDate] = useState(today());
   const [ending, setEnding] = useState('');
   const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [shown, setShown] = useState<number | null>(null);
   const cand = accountId ? run<{ beginningBalance: number; lines: ClearableLine[] }>('bank.candidates', { accountId, statementDate }) : null;
   const lines = cand?.ok ? cand.value.lines : [];
   const beginning = cand?.ok ? cand.value.beginningBalance : 0;
@@ -74,7 +75,16 @@ export function Reconcile({ c }: { c: Company }) {
             </div>
             <ProblemBox p={out.problem} />
             {out.notice && <div class="notice" role="status">{out.notice}</div>}
-            <div class="row">
+            {history.length > 0 && (
+              <>
+                <h3>{t('History')}</h3>
+                <div class="row">
+                  {history.map((h) => <button key={h.id} class="small" aria-pressed={shown === h.id} onClick={() => setShown(shown === h.id ? null : h.id)}>{h.statementDate}</button>)}
+                </div>
+                {shown !== null && <RecReport c={c} id={shown} />}
+              </>
+            )}
+            <div class="row" style={{ marginTop: 'var(--s3)' }}>
               <button class="primary" onClick={finish} disabled={difference !== 0}>{t('Finish reconciliation')}</button>
               <span class="spacer" />
               {history.length > 0 && <button onClick={undo}>{t('Undo last reconciliation')} ({history.at(-1)!.statementDate})</button>}
@@ -82,6 +92,26 @@ export function Reconcile({ c }: { c: Company }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function RecReport({ c, id }: { c: Company; id: number }) {
+  const r = run<ReconciliationReport>('report.reconciliation', { id });
+  if (!r.ok) return <ProblemBox p={r.error} />;
+  const v = r.value;
+  return (
+    <div class="table-wrap" style={{ marginTop: 'var(--s3)' }}>
+      <table>
+        <tbody>
+          <tr><td>{t('Beginning balance')}</td><td class="n"><Money c={c} value={v.reconciliation.beginningBalance} /></td></tr>
+          <tr><td>{t('Cleared')} +</td><td class="n"><Money c={c} value={v.clearedIn} /></td></tr>
+          <tr><td>{t('Cleared')} −</td><td class="n"><Money c={c} value={-v.clearedOut} /></td></tr>
+          <tr class="sub"><td>{t('Statement ending balance')}</td><td class="n"><Money c={c} value={v.reconciliation.endingBalance} /></td></tr>
+          {v.uncleared.map((l) => <tr key={l.key}><td class="indent1 muted">{t('Uncleared')} · {l.date} · {l.memo}</td><td class="n"><Money c={c} value={l.amount} /></td></tr>)}
+          <tr class="sub"><td>{t('Register balance')}</td><td class="n"><Money c={c} value={v.registerBalance} /></td></tr>
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -4,6 +4,13 @@ import { formatAmount } from '../money.ts';
 import { balanceSheet, profitAndLoss, trialBalance } from '../reports.ts';
 import { openInvoices, partyBalances, unappliedCredits, unpaidBills } from '../subledger.ts';
 import { EXPECTED, studio } from './golden/studio.ts';
+import { bakery } from './golden/bakery.ts';
+import { checkIntegrity } from '../integrity.ts';
+
+test('the golden books pass the integrity check', () => {
+  assert.deepEqual(checkIntegrity(studio().c), { ok: true, value: true });
+  assert.deepEqual(checkIntegrity(bakery()), { ok: true, value: true });
+});
 
 const { c, doc } = studio();
 const f = (m: number) => formatAmount(m, c.currency);

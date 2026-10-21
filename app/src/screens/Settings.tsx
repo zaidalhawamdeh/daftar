@@ -1,8 +1,8 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { Company } from '../../../core/company.ts';
 import { fromText, toText } from '../../../store/serialize.ts';
 import { lang, t } from '../i18n.ts';
-import { openCompany, run } from '../state.ts';
+import { listBackups, openCompany, restoreBackup, run, useApp } from '../state.ts';
 import { DateInput, Field, ProblemBox, useOutcome } from '../ui.tsx';
 
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -12,6 +12,11 @@ export function Settings({ c }: { c: Company }) {
   const out = useOutcome();
   const [closing, setClosing] = useState(c.closingDate ?? '');
   const [reopen, setReopen] = useState(false);
+  const s = useApp();
+  const [versions, setVersions] = useState<{ key: number; savedAt: string }[]>([]);
+  useEffect(() => {
+    if (s.companyId) listBackups(s.companyId).then(setVersions).catch(() => setVersions([]));
+  }, [s.companyId, s.saving]);
   const months = lang() === 'ar' ? MONTHS_AR : MONTHS_EN;
 
   const saveClosing = () => {
@@ -67,9 +72,25 @@ export function Settings({ c }: { c: Company }) {
       <div class="card row">
         <button onClick={download}>{t('Download backup file')}</button>
         <label class="btn">
-          {t('Restore from file')}
+          {t('Open a backup file as a new company')}
           <input type="file" accept=".daftar,application/json" hidden onChange={restore} />
         </label>
+      </div>
+
+      <h2>{t('Earlier versions')}</h2>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            {versions.slice(1).map((v) => (
+              <tr key={v.key}>
+                <td class="num">{new Date(v.savedAt).toLocaleString(lang() === 'ar' ? 'ar' : 'en')}</td>
+                <td class="n">
+                  <button class="small" onClick={async () => { const r = await restoreBackup(v.key); if (!r.ok) out.fail(r.error); else out.succeed('✓'); }}>{t('Restore this version')}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

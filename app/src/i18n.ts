@@ -22,6 +22,16 @@ const AR: Record<string, string> = {
   'Close company': 'إغلاق الشركة',
   'Saved': 'محفوظ',
   'Saving…': 'جارٍ الحفظ…',
+  'Not saved': 'لم يُحفظ',
+  'Reload': 'إعادة التحميل',
+  'This company was changed in another tab. Reload to continue here.': 'تغيّرت هذه الشركة في نافذة أخرى. أعد التحميل لتتابع هنا.',
+  'Earlier versions': 'نسخ سابقة',
+  'Restore this version': 'استرجاع هذه النسخة',
+  'Open a backup file as a new company': 'فتح ملف نسخة احتياطية كشركة جديدة',
+  'History': 'السجل',
+  'Show report': 'عرض التقرير',
+  'Register balance': 'رصيد الدفتر',
+  'Uncleared': 'غير مطابَق',
   // welcome
   'Open-source accounting that stays on your computer.': 'محاسبة مفتوحة المصدر، تبقى على جهازك.',
   'New company': 'شركة جديدة',
@@ -165,7 +175,7 @@ const AR: Record<string, string> = {
   'Reopen closed periods': 'فتح الفترات المقفلة',
   'Backup': 'نسخة احتياطية',
   'Download backup file': 'تنزيل ملف نسخة احتياطية',
-  'Restore from file': 'استرجاع من ملف',
+
   // memorized
   'Frequency': 'التكرار',
   'Not scheduled': 'بدون جدولة',
@@ -216,6 +226,8 @@ const PROBLEMS_AR: Record<string, string> = {
   'account.name_taken': 'يوجد حساب بهذا الاسم.',
   'account.number_taken': 'رقم الحساب مستخدم.',
   'closing.reopen': 'هذا يفتح فترات مقفلة؛ أكّد للمتابعة.',
+  'company.elsewhere': 'تغيّرت هذه الشركة في نافذة أخرى. أعد التحميل لتتابع هنا.',
+  'line.account_missing': 'اختر صنفاً أو حساباً في كل سطر.',
   'line.control_needs_document': 'الذمم تتغير عبر الفواتير والدفعات والإشعارات فقط.',
 };
 

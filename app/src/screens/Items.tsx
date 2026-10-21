@@ -4,7 +4,7 @@ import type { Item, ItemType } from '../../../core/items.ts';
 import { formatAmount } from '../../../core/money.ts';
 import { t } from '../i18n.ts';
 import { run } from '../state.ts';
-import { AccountSelect, AmountInput, Empty, Field, Money, ProblemBox, parseMoney, useOutcome } from '../ui.tsx';
+import { AccountSelect, AmountInput, Empty, Field, Money, ProblemBox, badAmount, parseMoney, useOutcome } from '../ui.tsx';
 
 const ITEM_TYPES: [ItemType, string][] = [['service', 'Service'], ['non_inventory', 'Non-inventory part'], ['other_charge', 'Other charge']];
 
@@ -60,6 +60,8 @@ function ItemForm({ c, item, onDone }: { c: Company; item: Item | null; onDone: 
   const [purchaseAccountId, setPurchase] = useState(item?.purchaseAccountId ?? '');
   const save = (e: Event) => {
     e.preventDefault();
+    const bad = badAmount(c, price, cost);
+    if (bad) return out.fail(bad);
     const params = { type, name, description, price: parseMoney(c, price) ?? 0, cost: parseMoney(c, cost) ?? 0, salesAccountId: salesAccountId || null, purchaseAccountId: purchaseAccountId || null };
     const r = item ? run('item.update', { id: item.id, ...params, type: undefined }) : run('item.create', params);
     if (!r.ok) return out.fail(r.error);

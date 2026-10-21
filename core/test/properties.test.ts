@@ -10,6 +10,7 @@ import { fiscalYearStart } from '../dates.ts';
 import { postEntry, reverseEntry } from '../journal.ts';
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from '../reports.ts';
 import { cashFlow } from '../cashflow.ts';
+import { checkIntegrity } from '../integrity.ts';
 
 // Small seeded generator so a failure can be replayed.
 function rng(seed: number) {
@@ -73,6 +74,7 @@ const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
 test('trial balance always balances', () => {
   for (const seed of SEEDS) {
     const { c, dates } = randomBooks(seed);
+    assert.deepEqual(checkIntegrity(c), { ok: true, value: true }, `seed ${seed}`);
     for (const d of [...dates.slice(0, 5), '2023-01-01', '2026-12-31']) {
       const tb = trialBalance(c, d);
       assert.ok(tb.ok);
@@ -200,6 +202,7 @@ test('reconciliation: register balance = statement balance + uncleared lines, th
           assert.equal(r.error!.code, 'reconcile.date_order', `seed ${seed}`);
           continue;
         }
+        assert.deepEqual(checkIntegrity(c), { ok: true, value: true }, `seed ${seed}: integrity after reconciling`);
         const rep = execute(c, 'report.reconciliation', { id: r.value.id }) as { ok: true; value: { registerBalance: number; uncleared: { amount: number }[] } };
         assert.equal(rep.value.registerBalance, ending + rep.value.uncleared.reduce((t, l) => t + l.amount, 0), `seed ${seed} ${bank.number} ${statementDate}`);
       }

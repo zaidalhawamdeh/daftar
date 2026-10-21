@@ -4,7 +4,7 @@ import { openBalance, unapplied, type DocKind } from '../../../core/documents.ts
 import { t } from '../i18n.ts';
 import { docName, docsName } from '../labels.ts';
 import { go, run } from '../state.ts';
-import { Empty, Money, ProblemBox, useOutcome } from '../ui.tsx';
+import { Empty, Money, ProblemBox, today, useOutcome } from '../ui.tsx';
 
 const NEW_SCREEN: Partial<Record<DocKind, [string, Record<string, unknown>]>> = {
   estimate: ['sales-form', { kind: 'estimate' }],
@@ -68,8 +68,8 @@ export function Docs({ c, kind }: { c: Company; kind: DocKind }) {
                     {showOpen && <td class="n"><Money c={c} value={open} blankZero /></td>}
                     <td>{status}</td>
                     <td class="n">
-                      {!d.voided && kind === 'estimate' && d.status === 'open' && <button class="small" onClick={() => act('estimate.toInvoice', { docId: d.id })}>{t('Convert to invoice')}</button>}
-                      {!d.voided && kind === 'purchase_order' && d.status === 'open' && <button class="small" onClick={() => act('purchaseOrder.toBill', { docId: d.id })}>{t('Receive as bill')}</button>}
+                      {!d.voided && kind === 'estimate' && d.status === 'open' && <button class="small" onClick={() => act('estimate.toInvoice', { docId: d.id, date: today() })}>{t('Convert to invoice')}</button>}
+                      {!d.voided && kind === 'purchase_order' && d.status === 'open' && <button class="small" onClick={() => act('purchaseOrder.toBill', { docId: d.id, date: today() })}>{t('Receive as bill')}</button>}
                       {!d.voided && CREDIT_KINDS.has(kind) && open > 0 && (
                         <button class="small" onClick={() => go('apply-credit', { side: kind === 'payment' || kind === 'credit_memo' ? 'customer' : 'vendor', sourceId: d.id })}>{t('Apply credit')}</button>
                       )}{' '}

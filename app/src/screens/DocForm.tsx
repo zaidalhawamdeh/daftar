@@ -61,21 +61,31 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
   const pickItem = (i: number, itemId: string) => {
     const item = c.items.get(itemId);
     const rate = item ? (cfg.side === 'sales' ? item.price : item.cost) : 0;
-    setLine(i, { itemId, description: item?.description ?? lines[i]!.description, rate: item && rate ? formatAmount(rate, c.currency, { grouping: false }) : lines[i]!.rate });
+    setLine(i, { itemId, description: item?.description ?? lines[i]!.description, rate: item ? (rate ? formatAmount(rate, c.currency, { grouping: false }) : '') : lines[i]!.rate });
+  };
+  // A blank rate on an item line means the item's own price, exactly as the core will post it.
+  const rateOf = (l: LineRow): number | null => {
+    if (l.rate.trim()) return parseMoney(c, l.rate);
+    const item = l.itemId ? c.items.get(l.itemId) : undefined;
+    return item ? (cfg.side === 'sales' ? item.price : item.cost) : null;
   };
   const amountOf = (l: LineRow): number | null => {
     const q = parseQuantity(l.quantity || '1');
-    const r = parseMoney(c, l.rate);
+    const r = rateOf(l);
     if (!q.ok || r === null) return null;
     const a = lineAmount(q.value, r);
     return a.ok ? a.value : null;
   };
-  const used = lines.filter((l) => l.itemId || l.accountId || l.rate.trim());
+  const used = lines.filter((l) => l.itemId || l.accountId || l.rate.trim() || l.description.trim());
   const total = used.reduce((s, l) => s + (amountOf(l) ?? 0), 0);
 
   const params = (): Record<string, unknown> | null => {
     const built = [];
     for (const l of used) {
+      if (!l.itemId && !l.accountId) {
+        out.fail({ code: 'line.account_missing', message: 'Choose an item or an account on every line.' });
+        return null;
+      }
       const rate = parseMoney(c, l.rate);
       if (l.rate.trim() && rate === null) {
         out.fail({ code: 'amount.invalid', message: `"${l.rate}" is not an amount.` });
@@ -159,7 +169,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
                     <td><input value={l.description} aria-label={t('Description')} onInput={(e) => setLine(i, { description: (e.target as HTMLInputElement).value })} /></td>
                     <td><input class="amount" value={l.quantity} aria-label={t('Quantity')} aria-invalid={!!l.quantity && !parseQuantity(l.quantity).ok} onInput={(e) => setLine(i, { quantity: (e.target as HTMLInputElement).value })} /></td>
                     <td><AmountInput c={c} value={l.rate} label={t('Rate')} onInput={(v) => setLine(i, { rate: v })} /></td>
-                    <td class="n">{a !== null && (l.itemId || l.accountId) ? <Money c={c} value={a} /> : ''}</td>
+                    <td class="n">{a !== null && (l.itemId || l.accountId) ? <Money c={c} value={a} /> : l.rate.trim() || l.itemId ? <span class="neg">?</span> : ''}</td>
                     <td><button class="small" type="button" aria-label={t('Remove line')} onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [blank()])}>×</button></td>
                   </tr>
                 );

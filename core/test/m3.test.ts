@@ -10,6 +10,7 @@ import { formatAmount } from '../money.ts';
 import { trialBalance } from '../reports.ts';
 import { aging } from '../subledger.ts';
 import { bakery } from './golden/bakery.ts';
+import { checkIntegrity } from '../integrity.ts';
 import { studio } from './golden/studio.ts';
 
 type R = { ok: boolean; value?: unknown; error?: { code: string; details?: Record<string, unknown> } };
@@ -136,6 +137,7 @@ test('reconciling the studio’s checking account: March leaves a check outstand
   assert.equal(code(execute(c, 'bank.undoReconciliation', { accountId: checking }) as R), 'ok');
   assert.equal(code(execute(c, 'bank.undoReconciliation', { accountId: checking }) as R), 'reconcile.none');
   assert.equal(code(execute(c, 'document.void', { docId: doc.TR1!.id }) as R), 'ok');
+  assert.deepEqual(checkIntegrity(c), { ok: true, value: true }, 'after reconcile, undo and void');
 });
 
 test('only bank and credit card accounts reconcile; a credit card statement shows what is owed', () => {
@@ -193,6 +195,7 @@ test('running the schedule is all or nothing', () => {
   assert.equal(code(ok), 'ok');
   assert.equal([...c.documents.values()].filter((d) => d.kind === 'invoice').length, 1, 'one quarterly invoice by 31 Mar');
   assert.equal(ok.value.length, 1 + 13, 'one quarterly invoice and thirteen weekly expenses');
+  assert.deepEqual(checkIntegrity(c), { ok: true, value: true });
 });
 
 test('memorized templates are checked when saved, and can be entered by hand', () => {

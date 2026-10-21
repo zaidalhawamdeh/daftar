@@ -7,7 +7,7 @@ import { formatAmount } from '../../../core/money.ts';
 import { t } from '../i18n.ts';
 import { docName } from '../labels.ts';
 import { go, run } from '../state.ts';
-import { AmountInput, DateInput, Field, Money, ProblemBox, parseMoney, today, useOutcome } from '../ui.tsx';
+import { AmountInput, DateInput, Field, Money, ProblemBox, badAmount, parseMoney, today, useOutcome } from '../ui.tsx';
 
 export function ApplyCredit({ c, side, sourceId: initial }: { c: Company; side: 'customer' | 'vendor'; sourceId?: number | undefined }) {
   const out = useOutcome();
@@ -22,6 +22,8 @@ export function ApplyCredit({ c, side, sourceId: initial }: { c: Company; side: 
     : [];
   const save = () => {
     if (!source) return;
+    const bad = badAmount(c, ...Object.values(applied));
+    if (bad) return out.fail(bad);
     const applications = Object.entries(applied).map(([id, v]) => ({ docId: Number(id), amount: parseMoney(c, v) })).filter((a) => a.amount);
     const r = run(side === 'customer' ? 'ar.apply' : 'ap.apply', { sourceId: source.id, date, applications });
     if (!r.ok) return out.fail(r.error);
