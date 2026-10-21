@@ -129,6 +129,7 @@ export interface ReconciliationReport {
 export function reconciliationReport(c: Company, id: unknown): Result<ReconciliationReport> {
   const r = c.reconciliations.find((x) => x.id === id);
   if (!r) return err('reconcile.missing', 'That reconciliation does not exist.');
+  if (r.undone) return err('reconcile.undone', 'That reconciliation was undone.');
   const all = linesOf(c, r.accountId, r.statementDate);
   const mine = new Set(r.lineKeys);
   const amounts = all.filter((l) => mine.has(l.key)).map((l) => l.amount);

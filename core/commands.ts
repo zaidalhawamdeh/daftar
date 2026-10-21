@@ -165,7 +165,8 @@ commands.push(
 // a throwaway copy to check a template.
 const runner = (c: Company): Runner => ({
   run: (id, p) => COMMANDS.get(id)?.run(c, p) ?? err('command.unknown', `Unknown command "${id}".`),
-  dryRun: (id, p) => COMMANDS.get(id)?.run(structuredClone(c), p) ?? err('command.unknown', `Unknown command "${id}".`),
+  // The check runs with the books open, so a closed period cannot hide a broken template.
+  dryRun: (id, p) => COMMANDS.get(id)?.run({ ...structuredClone(c), closingDate: null }, p) ?? err('command.unknown', `Unknown command "${id}".`),
 });
 
 commands.push(

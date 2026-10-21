@@ -133,6 +133,9 @@ export function reverseEntry(c: Company, input: ReverseInput, opts: { forDocumen
   if (original.source && !opts.forDocument) {
     return err('entry.has_document', `Entry ${original.id} belongs to a ${original.source.kind.replace('_', ' ')}; void the document instead.`);
   }
+  if (original.lines.some((_, i) => c.cleared.has(`${original.id}:${i}`))) {
+    return err('entry.reconciled', `Entry ${original.id} is part of a bank reconciliation; undo the reconciliation first.`);
+  }
   const existing = reversalOf(c, original.id);
   if (existing) return err('entry.already_reversed', `Entry ${original.id} is already reversed by entry ${existing.id}.`);
   if (original.reverses !== null) return err('entry.is_reversal', `Entry ${original.id} is itself a reversal; post a new entry instead.`);

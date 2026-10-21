@@ -249,6 +249,7 @@ export function updateAccount(c: Company, id: unknown, input: AccountInput): Res
     if (!isAccountType(input.type)) return err('account.type_invalid', 'Unknown account type.', { type: input.type });
     if (a.role) return err('account.system', `"${a.name}" is managed by the system; its type cannot change.`);
     if (hasPostings(c, a.id)) return err('account.type_locked', `"${a.name}" has postings; its type cannot change.`);
+    if (c.reconciliations.some((r) => r.accountId === a.id && !r.undone)) return err('account.type_locked', `"${a.name}" has been reconciled; its type cannot change.`);
     for (const child of c.accounts.values()) {
       if (child.parentId === a.id && classOf(child.type) !== classOf(input.type)) {
         return err('account.type_children', `"${a.name}" has sub-accounts of another kind.`);

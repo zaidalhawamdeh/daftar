@@ -53,11 +53,19 @@ export function createMemorized(c: Company, runner: Runner, input: unknown): Res
   if (!isObject(input.params)) return err('memorized.params', 'The transaction details are missing.');
   let params: Record<string, unknown>;
   try {
-    params = JSON.parse(JSON.stringify(input.params)) as Record<string, unknown>;
+    // A number that JSON cannot hold (NaN, Infinity) would come back as null; refuse it instead.
+    const text = JSON.stringify(input.params, (_k, v: unknown) => {
+      if (typeof v === 'number' && !Number.isFinite(v)) throw new Error('not a finite number');
+      return v;
+    });
+    params = JSON.parse(text) as Record<string, unknown>;
   } catch {
     return err('memorized.params', 'The transaction details cannot be saved.');
   }
   delete params.date;
+  // A fixed number or due date would be right once and wrong every time after.
+  if (params.number !== undefined) return err('memorized.fixed_number', 'Leave the number out; each entry gets its own.');
+  if (params.dueDate !== undefined) return err('memorized.fixed_due_date', 'Use terms (termsDays) instead of a fixed due date.');
   const frequency = input.frequency ?? null;
   if (frequency !== null && !FREQUENCIES.includes(frequency as Frequency)) return err('memorized.frequency', 'Frequency is weekly, monthly, quarterly or yearly.');
   let nextDate: string | null = null;
@@ -65,6 +73,7 @@ export function createMemorized(c: Company, runner: Runner, input: unknown): Res
   if (frequency !== null) {
     if (!isIsoDate(input.nextDate)) return err('date.invalid', 'Choose the date of the next occurrence.');
     nextDate = input.nextDate;
+    if (c.closingDate && nextDate <= c.closingDate) return err('date.closed', `The books are closed through ${c.closingDate}; start the schedule after that.`);
     if (input.endDate !== undefined && input.endDate !== null) {
       if (!isIsoDate(input.endDate) || input.endDate < nextDate) return err('memorized.end_invalid', 'The end date must be a real date on or after the next occurrence.');
       endDate = input.endDate;
@@ -72,7 +81,7 @@ export function createMemorized(c: Company, runner: Runner, input: unknown): Res
   }
   // Check the transaction itself, on a copy, so a broken template is refused now rather than later.
   const trial = runner.dryRun(input.command, { ...params, date: nextDate ?? input.trialDate ?? '2000-01-01' });
-  if (!trial.ok && trial.error.code !== 'date.closed') return err('memorized.template', `The saved transaction is not valid: ${trial.error.message}`, { cause: trial.error.code });
+  if (!trial.ok) return err('memorized.template', `The saved transaction is not valid: ${trial.error.message}`, { cause: trial.error.code });
   const m: Memorized = {
     id: `m-${c.nextMemorizedId++}`,
     name,
@@ -88,7 +97,7 @@ export function createMemorized(c: Company, runner: Runner, input: unknown): Res
   return ok(m);
 }
 
-// Enter a memorized transaction once, on the given date.
+// Enter a memorized transaction once, on the given date. This does not move its schedule.
 export function runMemorized(c: Company, runner: Runner, input: unknown): Result<unknown> {
   if (!isObject(input)) return err('memorized.invalid', 'Details are missing.');
   const m = typeof input.id === 'string' ? c.memorized.get(input.id) : undefined;
@@ -111,7 +120,7 @@ export function runDue(c: Company, runner: Runner, input: unknown): Result<{ mem
       if (!r.ok) return err('memorized.run_failed', `"${m.name}" on ${m.nextDate}: ${r.error.message}`, { memorizedId: m.id, date: m.nextDate, cause: r.error.code });
       made.push({ memorizedId: m.id, date: m.nextDate, result: r.value });
       const n = next(m.nextDate, m.frequency!, m.anchorDay);
-      m.nextDate = m.endDate !== null && n > m.endDate ? null : n;
+      m.nextDate = !isIsoDate(n) || (m.endDate !== null && n > m.endDate) ? null : n;
     }
   }
   return ok(made);
