@@ -84,6 +84,15 @@ npm run build
 npx vite preview app
 ```
 
+To build the Windows installer (`release/Daftar-Setup-<version>.exe`) and check the packaged program:
+
+```bash
+npm run dist:win
+node scripts/desktop-smoke.ts
+```
+
+The installer is not code-signed yet, so Windows SmartScreen warns before the first run.
+
 Your company is saved in the browser on your computer (IndexedDB), with the last 20 versions kept.
 Settings → *Download backup file* saves a `.daftar` file you can keep anywhere.
 
@@ -110,7 +119,7 @@ Intuit's public help pages.
 ## Roadmap
 
 VAT for the UAE and Saudi Arabia (including Saudi e-invoicing) · inventory · multiple currencies ·
-printable invoices and statements · a desktop package · several users.
+printable invoices and statements · a signed installer, and macOS and Linux packages · several users.
 
 ## Contributing
 
