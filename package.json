@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Clean-room, open-source, offline-first accounting for small businesses.",
+  "description": "Open-source, offline accounting for small businesses (QuickBooks Desktop-style workflows).",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=24"
@@ -14,11 +14,13 @@
     "parity": "node scripts/parity.ts",
     "check": "npm run typecheck && npm test && node scripts/parity.ts --check",
     "dev": "vite app",
-    "build": "vite build app"
+    "build": "vite build app",
+    "screenshots": "vite build app && node scripts/screenshots.ts"
   },
   "devDependencies": {
     "@preact/preset-vite": "2.10.6",
     "@types/node": "^24.19.2",
+    "playwright-core": "1.62.0",
     "typescript": "^5.9.3",
     "vite": "6.4.5"
   },

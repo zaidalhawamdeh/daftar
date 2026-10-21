@@ -96,7 +96,7 @@ function SectionRows({ c, title, s }: { c: Company; title: string; s: Section })
     <>
       <tr><td colSpan={2}><strong>{title}</strong></td></tr>
       <Rows c={c} rows={s.rows} />
-      <Line c={c} label={`${t('Total')} ${title}`} value={s.total} />
+      <Line c={c} label={lang() === 'ar' ? `مجموع ${title}` : `Total ${title}`} value={s.total} />
     </>
   );
 }
