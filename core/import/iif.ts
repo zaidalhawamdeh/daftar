@@ -31,7 +31,7 @@ function unquote(s: string): string {
 export function readIif(text: string): Result<IifRow[]> {
   const headers = new Map<string, string[]>();
   const rows: IifRow[] = [];
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
+  const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
   for (const [i, raw] of lines.entries()) {
     if (!raw.trim()) continue;
     const cells = raw.split('\t').map(unquote);
@@ -116,19 +116,33 @@ const MONEY_IN: AccountType[] = ['bank', 'other_current_asset'];
 const MONEY_OUT: AccountType[] = ['bank', 'credit_card'];
 const isControl = (t: AccountType) => t === 'accounts_receivable' || t === 'accounts_payable';
 
-export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean } = {}): Result<ImportSummary> {
+// "Net 30", "2% 10 Net 30", "30 days", "30" -> days until due.
+export function termsDays(s: string | undefined): number {
+  const t = (s ?? '').trim();
+  const m = /net\s*(\d{1,4})/i.exec(t) ?? /(\d{1,4})\s*days?/i.exec(t) ?? /^(\d{1,4})$/.exec(t);
+  return m ? Math.min(Number(m[1]), 3650) : 0;
+}
+
+export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean; allowDuplicates?: boolean } = {}): Result<ImportSummary> {
   if (typeof text !== 'string' || !text.trim()) return err('iif.empty', 'The file is empty.');
   const read = readIif(text);
   if (!read.ok) return read;
   const s: ImportSummary = { accounts: 0, customers: 0, vendors: 0, items: 0, transactions: 0, documents: {}, journalEntries: 0, throughClearing: 0, applied: 0, warnings: [] };
   const fail = (line: number, p: { message: string; code: string }) => err<ImportSummary>(p.code, `Line ${line}: ${p.message}`, { line });
+  const firstNewDoc = c.nextDocId; // documents created by this import have ids from here on
 
   // ---- accounts, by their full "Parent:Child" path
   const byPath = new Map<string, string>();
   for (const a of c.accounts.values()) byPath.set(pathOf(c, a).toLowerCase(), a.id);
   const ensureAccount = (path: string, type: AccountType, number: string, line: number): Result<string> => {
     const known = byPath.get(path.toLowerCase());
-    if (known) return ok(known);
+    if (known) {
+      const existing = c.accounts.get(known)!;
+      if (classOf(existing.type) !== classOf(type)) {
+        return err('iif.account_type_conflict', `Line ${line}: "${path}" already exists as a different kind of account.`);
+      }
+      return ok(known);
+    }
     const parts = path.split(':').map((p) => p.trim()).filter(Boolean);
     if (!parts.length) return err('iif.account_name', `Line ${line}: an account has no name.`);
     if (parts.length === 1 && classOf(type) === 'equity' && parts[0]!.toLowerCase() === 'retained earnings') {
@@ -151,8 +165,10 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
     return ok(made.value.id);
   };
   const accountOf = (path: string, line: number): Result<Account> => {
+    // By full name only: never by a blank cell, a number, or an internal id.
+    if (!path.trim()) return err('iif.account_blank', `Line ${line}: the account is blank.`);
     const id = byPath.get(path.trim().toLowerCase());
-    const a = id ? c.accounts.get(id) : findAccount(c, path.trim());
+    const a = id ? c.accounts.get(id) : undefined;
     return a ? ok(a) : err('iif.account_unknown', `Line ${line}: account "${path}" is not in the file's account list.`);
   };
 
@@ -179,13 +195,12 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
       if (existing.kind !== kind) s.warnings.push(`Line ${r.line}: "${name}" is already a ${existing.kind}; kept as ${existing.kind}.`);
       return ok(null);
     }
-    const terms = /(\d{1,4})/.exec(r.f.TERMS ?? '');
     const made = createParty(c, kind, {
       name,
       phone: (r.f.PHONE1 ?? '').slice(0, 50),
       email: (r.f.EMAIL ?? '').slice(0, 200),
       address: addrKeys.map((k) => r.f[k] ?? '').filter(Boolean).join(', ').slice(0, 500),
-      termsDays: terms ? Math.min(Number(terms[1]), 3650) : 0,
+      termsDays: termsDays(r.f.TERMS),
       notes: (r.f.NOTE ?? '').slice(0, 2000),
     });
     if (!made.ok) return err(made.error.code, `Line ${r.line}: ${made.error.message}`);
@@ -238,8 +253,11 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
 
   let i = 0;
   const rows = read.value;
+  let renumbered = 0;
   while (i < rows.length) {
-    if (rows[i]!.kind !== 'TRNS') {
+    const kind = rows[i]!.kind;
+    if (kind === 'SPL' || kind === 'ENDTRNS') return err('iif.orphan_line', `Line ${rows[i]!.line}: a ${kind} row is not inside a transaction (its TRNS row is missing).`);
+    if (kind !== 'TRNS') {
       i++;
       continue;
     }
@@ -253,25 +271,33 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
     const date = iifDate(head.f.DATE ?? '');
     if (!date) return err('iif.date', `Line ${head.line}: "${head.f.DATE}" is not a date.`);
     const lines: Line[] = [];
+    let raw = 0;
     for (const r of group) {
       const a = accountOf(r.f.ACCNT ?? '', r.line);
       if (!a.ok) return a as Result<never>;
       const amt = parseAmount((r.f.AMOUNT ?? '').replace(/^\+/, ''), c.currency);
       if (!amt.ok) return fail(r.line, amt.error);
+      raw += amt.value;
       if (amt.value === 0) continue;
       const nm = (r.f.NAME ?? '').trim();
       lines.push({ accountId: a.value.id, type: a.value.type, party: nm ? (parties.get(nm.toLowerCase()) ?? null) : null, amount: amt.value, memo: (r.f.MEMO ?? '').slice(0, 1000) });
     }
-    if (lines.length < 2) {
-      s.warnings.push(`Line ${head.line}: a transaction with no amounts was skipped.`);
+    if (raw !== 0) return err('iif.unbalanced', `Line ${head.line}: the transaction does not balance.`);
+    if (lines.length === 0) {
+      s.warnings.push(`Line ${head.line}: a transaction whose amounts are all zero was skipped.`);
       continue;
     }
-    if (lines.reduce((t, l) => t + l.amount, 0) !== 0) return err('iif.unbalanced', `Line ${head.line}: the transaction does not balance.`);
     s.transactions++;
     const type = (head.f.TRNSTYPE ?? '').toUpperCase().trim();
     const number = (head.f.DOCNUM ?? '').trim().slice(0, 30);
     const memo = (head.f.MEMO ?? '').slice(0, 1000);
-    const done = mapped(c, type, lines, { date, number, memo }, count);
+    const due = iifDate(head.f.DUEDATE ?? '');
+    if (number && !opts.allowDuplicates) {
+      const party = lines[0]!.party?.id ?? lines[1]?.party?.id ?? null;
+      const twin = [...c.documents.values()].find((d) => d.id < firstNewDoc && d.number === number && d.date === date && d.partyId === party);
+      if (twin) return err('iif.already_imported', `Line ${head.line}: ${type.toLowerCase()} ${number} of ${date} is already in the books; this file looks imported before.`);
+    }
+    const done = mapped(c, type, lines, { date, number, memo, due: due && due >= date ? due : null }, count, () => renumbered++);
     if (done.ok && done.value) continue;
     if (!done.ok) return fail(head.line, done.error);
 
@@ -306,7 +332,8 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
     }
   }
 
-  if (opts.autoApply !== false) s.applied = applyOldestFirst(c);
+  if (renumbered) s.warnings.push(`${renumbered} document number(s) were already in use and got new numbers.`);
+  if (opts.autoApply !== false) s.applied = applyOldestFirst(c, firstNewDoc);
   return ok(s);
 }
 
@@ -320,16 +347,19 @@ type Count = (kind: string) => void;
 
 // The transaction kinds that map onto one document. Returns ok(false) when the shape does not fit,
 // so the caller takes the generic route instead.
-function mapped(c: Company, type: string, lines: Line[], h: { date: string; number: string; memo: string }, count: Count): Result<boolean> {
+function mapped(c: Company, type: string, lines: Line[], h: { date: string; number: string; memo: string; due: string | null }, count: Count, renumbered: () => void): Result<boolean> {
   const [head, ...rest] = lines as [Line, ...Line[]];
   const plain = rest.every((l) => !isControl(l.type));
   const docLines = (sign: 1 | -1) => rest.map((l) => ({ accountId: l.accountId, amount: sign * l.amount, description: l.memo }));
   const restSign = (sign: 1 | -1) => rest.every((l) => sign * l.amount > 0);
+  // A number already in use (QuickBooks allows repeats) gets the next free one; the count is reported.
   const withNumber = <T>(make: (n: string | undefined) => Result<T>): Result<T> => {
-    let r = make(h.number || undefined);
-    for (let k = 2; !r.ok && r.error.code === 'doc.number_taken' && k < 1000; k++) r = make(`${h.number}-${k}`);
-    return r;
+    const r = make(h.number || undefined);
+    if (r.ok || r.error.code !== 'doc.number_taken') return r;
+    renumbered();
+    return make(undefined);
   };
+  const dueDate = h.due ? { dueDate: h.due } : {};
   const customer = head.party?.kind === 'customer' ? head.party.id : null;
   const vendor = head.party?.kind === 'vendor' ? head.party.id : null;
   const done = (r: Result<Doc>, kind: string): Result<boolean> => {
@@ -341,7 +371,7 @@ function mapped(c: Company, type: string, lines: Line[], h: { date: string; numb
   switch (type) {
     case 'INVOICE':
       if (head.type === 'accounts_receivable' && head.amount > 0 && customer && plain && restSign(-1))
-        return done(withNumber((number) => createSalesDoc(c, 'invoice', { customerId: customer, date: h.date, number, memo: h.memo, accountId: head.accountId, lines: docLines(-1) })), 'invoice');
+        return done(withNumber((number) => createSalesDoc(c, 'invoice', { customerId: customer, date: h.date, number, memo: h.memo, accountId: head.accountId, ...dueDate, lines: docLines(-1) })), 'invoice');
       break;
     case 'CREDIT MEMO':
       if (head.type === 'accounts_receivable' && head.amount < 0 && customer && plain && restSign(1))
@@ -349,7 +379,7 @@ function mapped(c: Company, type: string, lines: Line[], h: { date: string; numb
       break;
     case 'BILL':
       if (head.type === 'accounts_payable' && head.amount < 0 && vendor && plain && restSign(1))
-        return done(withNumber((number) => createPurchaseDoc(c, 'bill', { vendorId: vendor, date: h.date, number, memo: h.memo, accountId: head.accountId, lines: docLines(1) })), 'bill');
+        return done(withNumber((number) => createPurchaseDoc(c, 'bill', { vendorId: vendor, date: h.date, number, memo: h.memo, accountId: head.accountId, ...dueDate, lines: docLines(1) })), 'bill');
       break;
     case 'CASH SALE':
       if (MONEY_IN.includes(head.type) && head.amount > 0 && plain && restSign(-1))
@@ -361,8 +391,10 @@ function mapped(c: Company, type: string, lines: Line[], h: { date: string; numb
         return done(createPurchaseDoc(c, 'expense', { vendorId: vendor, date: h.date, number: h.number || undefined, memo: h.memo, payFromId: head.accountId, lines: docLines(1) }), 'expense');
       break;
     case 'PAYMENT': {
+      // One payment may cover several invoices: several receivable lines, one customer, one account.
       const [ar] = rest;
-      if (rest.length === 1 && ar && MONEY_IN.includes(head.type) && head.amount > 0 && ar.type === 'accounts_receivable' && ar.party?.kind === 'customer')
+      const oneCustomer = rest.every((l) => l.type === 'accounts_receivable' && l.amount < 0 && l.party?.id === ar?.party?.id && l.accountId === ar?.accountId);
+      if (ar && oneCustomer && MONEY_IN.includes(head.type) && head.amount > 0 && ar.party?.kind === 'customer')
         return done(createSettlement(c, 'payment', { customerId: ar.party.id, date: h.date, amount: head.amount, depositToId: head.accountId, accountId: ar.accountId, number: h.number || undefined, memo: h.memo }), 'payment');
       break;
     }
@@ -370,7 +402,8 @@ function mapped(c: Company, type: string, lines: Line[], h: { date: string; numb
     case 'BILL PMT -CCARD':
     case 'BILLPMT': {
       const [ap] = rest;
-      if (rest.length === 1 && ap && MONEY_OUT.includes(head.type) && head.amount < 0 && ap.type === 'accounts_payable' && ap.party?.kind === 'vendor')
+      const oneVendor = rest.every((l) => l.type === 'accounts_payable' && l.amount > 0 && l.party?.id === ap?.party?.id && l.accountId === ap?.accountId);
+      if (ap && oneVendor && MONEY_OUT.includes(head.type) && head.amount < 0 && ap.party?.kind === 'vendor')
         return done(createSettlement(c, 'bill_payment', { vendorId: ap.party.id, date: h.date, amount: -head.amount, payFromId: head.accountId, accountId: ap.accountId, number: h.number || undefined, memo: h.memo }), 'bill_payment');
       break;
     }
@@ -389,21 +422,47 @@ function mapped(c: Company, type: string, lines: Line[], h: { date: string; numb
 }
 
 // IIF payments carry no link to the invoices they paid; apply each to the oldest open documents.
-function applyOldestFirst(c: Company): number {
+// Only documents this import created take part: what was already in the books is left as it was.
+// Open and unapplied amounts are tracked here, so a file with thousands of payments stays fast.
+function applyOldestFirst(c: Company, firstNewDoc: number): number {
   let applied = 0;
-  const docs = [...c.documents.values()];
+  const fresh = [...c.documents.values()].filter((d) => d.id >= firstNewDoc && !d.voided);
   const byDate = (a: Doc, b: Doc) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id);
   for (const [sources, target] of [[['payment', 'credit_memo'], 'invoice'], [['bill_payment', 'vendor_credit'], 'bill']] as const) {
-    for (const src of docs.filter((d) => (sources as readonly string[]).includes(d.kind) && !d.voided).sort(byDate)) {
-      for (const tgt of docs.filter((d) => d.kind === target && !d.voided && d.partyId === src.partyId && d.accountId === src.accountId).sort(byDate)) {
-        const left = unapplied(c, src);
-        if (left <= 0) break;
-        const open = openBalance(c, tgt);
-        if (open <= 0) continue;
-        const date = src.date > tgt.date ? src.date : tgt.date;
-        const r = applyCredit(c, { sourceId: src.id, date, applications: [{ docId: tgt.id, amount: Math.min(left, open) }] });
-        if (r.ok) applied++;
+    const open = new Map<number, Minor>();
+    const queues = new Map<string, Doc[]>();
+    for (const t of fresh.filter((d) => d.kind === target).sort(byDate)) {
+      open.set(t.id, openBalance(c, t));
+      const k = `${t.partyId}|${t.accountId}`;
+      const q = queues.get(k) ?? [];
+      q.push(t);
+      queues.set(k, q);
+    }
+    for (const src of fresh.filter((d) => (sources as readonly string[]).includes(d.kind)).sort(byDate)) {
+      let left = unapplied(c, src);
+      const queue = queues.get(`${src.partyId}|${src.accountId}`) ?? [];
+      const apps: { docId: number; amount: Minor }[] = [];
+      let latest = src.date;
+      let k = 0;
+      while (left > 0 && k < queue.length) {
+        const tgt = queue[k]!;
+        const o = open.get(tgt.id)!;
+        if (o === 0) {
+          k++;
+          continue;
+        }
+        const amount = Math.min(left, o);
+        if (tgt.date > latest) latest = tgt.date;
+        apps.push({ docId: tgt.id, amount });
+        left -= amount;
+        open.set(tgt.id, o - amount);
+        if (o - amount === 0) k++;
       }
+      if (!apps.length) continue;
+      // Dated when both sides exist: the later of the payment and the last document it settles.
+      const r = applyCredit(c, { sourceId: src.id, date: latest, applications: apps });
+      if (r.ok) applied += apps.length;
+      else for (const a of apps) open.set(a.docId, open.get(a.docId)! + a.amount);
     }
   }
   return applied;
@@ -421,7 +480,11 @@ const TRNSTYPE: Record<string, string> = {
   transfer: 'TRANSFER',
 };
 
-const clean = (s: string) => s.replace(/[\t\r\n]+/g, ' ').replace(/"/g, "'");
+// Tabs and line breaks cannot live in a cell; quotes are kept by quoting the cell, as QuickBooks reads it.
+const clean = (s: string) => {
+  const one = s.replace(/[\t\r\n]+/g, ' ');
+  return one.includes('"') ? `"${one.replace(/"/g, '""')}"` : one;
+};
 const mdy = (d: string) => `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}`;
 
 export function exportIif(c: Company): string {

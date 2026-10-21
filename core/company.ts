@@ -223,9 +223,16 @@ function checkSiblingName(c: Company, name: string, parentId: string | null, sel
   return ok(name);
 }
 
+// A colon separates "Parent:Child" in paths, so it cannot be part of an account's own name.
+function accountName(v: unknown): Result<string> {
+  const name = cleanName(v, 100, 'account name');
+  if (name.ok && name.value.includes(':')) return err('account.name_colon', 'An account name cannot contain ":" (it separates parent and sub-account).');
+  return name;
+}
+
 export function createAccount(c: Company, input: AccountInput): Result<Account> {
   if (!isObject(input)) return err('account.invalid', 'Account details are missing.');
-  const name = cleanName(input.name, 100, 'account name');
+  const name = accountName(input.name);
   if (!name.ok) return name;
   if (!isAccountType(input.type)) return err('account.type_invalid', 'Unknown account type.', { type: input.type });
   const type = input.type;
@@ -242,7 +249,7 @@ export function updateAccount(c: Company, id: unknown, input: AccountInput): Res
   const a = typeof id === 'string' ? c.accounts.get(id) : undefined;
   if (!a) return err('account.missing', 'Account does not exist.');
   if (!isObject(input)) return err('account.invalid', 'Account details are missing.');
-  const name = input.name === undefined ? ok(a.name) : cleanName(input.name, 100, 'account name');
+  const name = input.name === undefined ? ok(a.name) : accountName(input.name);
   if (!name.ok) return name;
   let type = a.type;
   if (input.type !== undefined && input.type !== a.type) {

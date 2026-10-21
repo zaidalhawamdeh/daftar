@@ -71,7 +71,7 @@ export function checkIntegrity(c: Company): Result<true> {
     let retained = 0;
     for (const [id, a] of acc) {
       if (!isObj(a) || a.id !== id || !/^acc-\d{1,12}$/.test(id)) return no(`account ${String(id)}`);
-      if (!isName(a.name, 100) || !isStr(a.number, 20) || !isAccountType(a.type) || typeof a.active !== 'boolean') return no(`account ${id}`);
+      if (!isName(a.name, 100) || a.name.includes(':') || !isStr(a.number, 20) || !isAccountType(a.type) || typeof a.active !== 'boolean') return no(`account ${id}`);
       if (a.role !== null && a.role !== 'retained_earnings') return no(`account ${id} role`);
       if (a.role) {
         retained++;
