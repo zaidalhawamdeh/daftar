@@ -479,6 +479,12 @@ export function voidDoc(c: Company, input: unknown): Result<Doc> {
   if (doc.voided) return err('doc.void', 'It is already void.');
   const applied = live(c).filter((a) => a.targetId === doc.id || (a.sourceId === doc.id && (doc.kind === 'credit_memo' || doc.kind === 'vendor_credit')));
   if (applied.length) return err('doc.applied', 'Payments or credits are applied to it; void those first.');
+  if (doc.entryId !== null) {
+    const entry = c.entries.find((e) => e.id === doc.entryId);
+    if (entry?.lines.some((_, i) => c.cleared.has(`${entry.id}:${i}`))) {
+      return err('doc.reconciled', 'It is part of a bank reconciliation; undo the reconciliation first.');
+    }
+  }
   if ((doc.kind === 'estimate' || doc.kind === 'purchase_order') && doc.status === 'closed' && doc.linkedId !== null) {
     return err('doc.converted', 'It has been converted; void the document it became first.');
   }

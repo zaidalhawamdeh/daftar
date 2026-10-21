@@ -4,7 +4,8 @@ import { execute } from '../commands.ts';
 import { createCompany, findAccount, type Company } from '../company.ts';
 import { postEntry } from '../journal.ts';
 import { lineAmount, parseQuantity } from '../quantity.ts';
-import { openInvoices, partyBalances, unappliedCredits, unpaidBills } from '../subledger.ts';
+import { aging, openInvoices, partyBalances, unappliedCredits, unpaidBills } from '../subledger.ts';
+import { cashFlow } from '../cashflow.ts';
 import { trialBalance } from '../reports.ts';
 
 type R = { ok: boolean; value?: unknown; error?: { code: string } };
@@ -219,6 +220,14 @@ test('random documents: A/R and A/P tie to party balances and to open documents 
       assert.equal(oi.value.total - credits('customer'), arNet, `seed ${seed} ${asOf}: open invoices − unapplied = A/R`);
       assert.equal(vb.value.total, apNet, `seed ${seed} ${asOf}: vendor balances = A/P`);
       assert.equal(ub.value.total - credits('vendor'), apNet, `seed ${seed} ${asOf}: unpaid bills − unapplied = A/P`);
+      const ag = aging(c, 'customer', asOf, int(1, 60), int(1, 6));
+      const apg = aging(c, 'vendor', asOf);
+      assert.ok(ag.ok && apg.ok);
+      assert.equal(ag.value.total, arNet, `seed ${seed} ${asOf}: A/R aging = A/R`);
+      assert.equal(ag.value.totals.reduce((t, x) => t + x, 0), arNet, `seed ${seed} ${asOf}: aging columns add up`);
+      assert.equal(apg.value.total, apNet, `seed ${seed} ${asOf}: A/P aging = A/P`);
+      const cf = cashFlow(c, '2026-02-01', asOf);
+      assert.ok(cf.ok, `seed ${seed}: cash flow reconciles`);
       for (const d of c.documents.values()) assert.ok(d.voided || (d.kind !== 'invoice' && d.kind !== 'bill') || (oi.value.rows.concat(ub.value.rows).find((r) => r.docId === d.id)?.open ?? 0) >= 0);
     }
   }

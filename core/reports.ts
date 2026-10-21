@@ -42,6 +42,11 @@ function accumulate(c: Company, from: string | null, to: string): Balances {
   return m;
 }
 
+// Debit-positive balance of every account from `from` (or the beginning) through `to`.
+export function balancesBetween(c: Company, from: string | null, to: string): Result<Balances> {
+  return guard(() => ok(accumulate(c, from, to)));
+}
+
 const sign = (t: AccountType): 1 | -1 => (normalSide(t) === 'debit' ? 1 : -1);
 // Natural-sign amount; never returns -0.
 const natural = (t: AccountType, debitPositive: Minor): Minor => (sign(t) === 1 || debitPositive === 0 ? debitPositive : -debitPositive);

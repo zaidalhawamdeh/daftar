@@ -6,7 +6,9 @@ import { isIsoDate } from './dates.ts';
 import { currency, type Currency, type Minor } from './money.ts';
 import { err, ok, type Result } from './result.ts';
 import { BASIC_CHART } from './templates.ts';
+import type { Reconciliation } from './banking.ts';
 import type { Application, Doc } from './documents.ts';
+import type { Memorized } from './memorized.ts';
 import type { Item } from './items.ts';
 import type { Party } from './parties.ts';
 
@@ -48,12 +50,17 @@ export interface Company {
   items: Map<string, Item>;
   documents: Map<number, Doc>;
   applications: Application[];
+  reconciliations: Reconciliation[];
+  cleared: Map<string, number>; // "entryId:lineIndex" → reconciliation id
+  memorized: Map<string, Memorized>;
   nextAccountId: number;
   nextEntryId: number;
   nextPartyId: number;
   nextItemId: number;
   nextDocId: number;
   nextApplicationId: number;
+  nextReconciliationId: number;
+  nextMemorizedId: number;
 }
 
 export interface CreateCompanyInput {
@@ -105,12 +112,17 @@ export function createCompany(input: CreateCompanyInput): Result<Company> {
     items: new Map(),
     documents: new Map(),
     applications: [],
+    reconciliations: [],
+    cleared: new Map(),
+    memorized: new Map(),
     nextAccountId: 1,
     nextEntryId: 1,
     nextPartyId: 1,
     nextItemId: 1,
     nextDocId: 1,
     nextApplicationId: 1,
+    nextReconciliationId: 1,
+    nextMemorizedId: 1,
   };
   const re = insertAccount(company, { number: '3900', name: RETAINED_EARNINGS[language], type: 'equity', parentId: null });
   re.role = 'retained_earnings';

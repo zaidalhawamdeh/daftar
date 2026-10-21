@@ -9,6 +9,7 @@ import { createParty } from '../parties.ts';
 import { fiscalYearStart } from '../dates.ts';
 import { postEntry, reverseEntry } from '../journal.ts';
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from '../reports.ts';
+import { cashFlow } from '../cashflow.ts';
 
 // Small seeded generator so a failure can be replayed.
 function rng(seed: number) {
@@ -163,6 +164,46 @@ test('moving accounts under new parents and deactivating them never breaks roll-
       }
     }
     assert.equal(bs.value.assets.total, bs.value.totalLiabilitiesAndEquity, `seed ${seed}`);
+  }
+});
+
+test('cash flow: beginning cash + net change = ending cash, for any range', () => {
+  for (const seed of SEEDS.slice(0, 150)) {
+    const { c, dates } = randomBooks(seed);
+    const sorted = [...dates].sort();
+    for (let k = 0; k < 3; k++) {
+      const from = sorted[(k * 5) % sorted.length]!;
+      const to = sorted[Math.min(sorted.length - 1, (k * 5) % sorted.length + 3 + k * 9)]!;
+      if (from > to) continue;
+      const cf = cashFlow(c, from, to);
+      assert.ok(cf.ok, `seed ${seed} ${from}..${to}: ${cf.ok ? '' : cf.error.code}`);
+      assert.equal(cf.value.cashAtBeginning + cf.value.netChange, cf.value.cashAtEnd);
+      const pl = profitAndLoss(c, from, to);
+      assert.ok(pl.ok);
+      assert.equal(cf.value.netIncome, pl.value.netIncome, `seed ${seed}: cash flow starts from the P&L net income`);
+    }
+  }
+});
+
+test('reconciliation: register balance = statement balance + uncleared lines, through any sequence', () => {
+  for (const seed of SEEDS.slice(0, 120)) {
+    const { c, rand } = randomBooks(seed);
+    const banks = [...c.accounts.values()].filter((a) => a.type === 'bank' || a.type === 'credit_card');
+    for (const bank of banks) {
+      for (const statementDate of ['2024-06-30', '2024-12-31', '2025-06-30', '2025-12-31', '2026-06-30', '2026-12-31']) {
+        if (rand() < 0.15) execute(c, 'bank.undoReconciliation', { accountId: bank.id });
+        const cand = execute(c, 'bank.candidates', { accountId: bank.id, statementDate }) as { ok: true; value: { beginningBalance: number; lines: { key: string; amount: number }[] } };
+        const ticked = cand.value.lines.filter(() => rand() < 0.7);
+        const ending = cand.value.beginningBalance + ticked.reduce((t, l) => t + l.amount, 0);
+        const r = execute(c, 'bank.reconcile', { accountId: bank.id, statementDate, endingBalance: ending, lineKeys: ticked.map((l) => l.key) }) as { ok: boolean; value: { id: number }; error?: { code: string } };
+        if (!r.ok) {
+          assert.equal(r.error!.code, 'reconcile.date_order', `seed ${seed}`);
+          continue;
+        }
+        const rep = execute(c, 'report.reconciliation', { id: r.value.id }) as { ok: true; value: { registerBalance: number; uncleared: { amount: number }[] } };
+        assert.equal(rep.value.registerBalance, ending + rep.value.uncleared.reduce((t, l) => t + l.amount, 0), `seed ${seed} ${bank.number} ${statementDate}`);
+      }
+    }
   }
 });
 

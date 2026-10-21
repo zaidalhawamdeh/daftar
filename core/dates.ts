@@ -25,6 +25,26 @@ export function addDays(date: string, days: number): string {
   return `${pad(t.getUTCFullYear(), 4)}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
 }
 
+// Whole days from a to b (positive when b is later).
+export function daysBetween(a: string, b: string): number {
+  const t = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number) as [number, number, number];
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((t(b) - t(a)) / 86_400_000);
+}
+
+// The same day `months` later, kept on `anchorDay` and clamped to the end of shorter months
+// (31 Jan → 28 Feb → 31 Mar).
+export function addMonths(date: string, months: number, anchorDay?: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const total = y * 12 + (m - 1) + months;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  const day = Math.min(anchorDay ?? d, daysInMonth(ny, nm));
+  return `${pad(ny, 4)}-${pad(nm)}-${pad(day)}`;
+}
+
 export function dayBefore(date: string): string {
   return addDays(date, -1);
 }

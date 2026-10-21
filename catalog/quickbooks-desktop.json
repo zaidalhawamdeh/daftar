@@ -114,13 +114,13 @@
    "id": "company.memorized-saved-transactions",
    "area": "company",
    "feature": "Memorized (saved) transactions",
-   "command": null
+   "command": "memorized.create"
   },
   {
    "id": "company.recurring-memorized-transactions-on-a-schedule",
    "area": "company",
    "feature": "Recurring memorized transactions on a schedule",
-   "command": null
+   "command": "memorized.runDue"
   },
   {
    "id": "lists.chart-of-accounts",
@@ -486,25 +486,25 @@
    "id": "banking.bank-register-with-running-balance",
    "area": "banking",
    "feature": "Bank register with running balance",
-   "command": null
+   "command": "report.generalLedger"
   },
   {
    "id": "banking.reconcile-bank-account-against-statement",
    "area": "banking",
    "feature": "Reconcile bank account against statement",
-   "command": null
+   "command": "bank.reconcile"
   },
   {
    "id": "banking.reconcile-credit-card-account",
    "area": "banking",
    "feature": "Reconcile credit card account",
-   "command": null
+   "command": "bank.reconcile"
   },
   {
    "id": "banking.undo-last-reconciliation",
    "area": "banking",
    "feature": "Undo last reconciliation",
-   "command": null
+   "command": "bank.undoReconciliation"
   },
   {
    "id": "banking.reconciliation-discrepancy-report",
@@ -744,31 +744,31 @@
    "id": "reports.statement-of-cash-flows",
    "area": "reports",
    "feature": "Statement of cash flows",
-   "command": null
+   "command": "report.cashFlow"
   },
   {
    "id": "reports.a-r-aging-summary",
    "area": "reports",
    "feature": "A/R aging summary",
-   "command": null
+   "command": "report.arAging"
   },
   {
    "id": "reports.a-r-aging-detail",
    "area": "reports",
    "feature": "A/R aging detail",
-   "command": null
+   "command": "report.arAging"
   },
   {
    "id": "reports.a-p-aging-summary",
    "area": "reports",
    "feature": "A/P aging summary",
-   "command": null
+   "command": "report.apAging"
   },
   {
    "id": "reports.a-p-aging-detail",
    "area": "reports",
    "feature": "A/P aging detail",
-   "command": null
+   "command": "report.apAging"
   },
   {
    "id": "reports.open-invoices",

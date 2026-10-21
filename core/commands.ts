@@ -11,13 +11,16 @@ import {
   type Company,
   type Entry,
 } from './company.ts';
+import { reconcile, reconcileCandidates, reconciliationReport, undoReconciliation } from './banking.ts';
+import { cashFlow } from './cashflow.ts';
+import { createMemorized, deleteMemorized, runDue, runMemorized, setMemorizedActive, type Memorized, type Runner } from './memorized.ts';
 import { applyCredit, convertDoc, createPurchaseDoc, createSalesDoc, createSettlement, createTransfer, voidDoc, type Doc } from './documents.ts';
 import { createItem, setItemActive, updateItem, type Item } from './items.ts';
 import { postEntry, reverseEntry } from './journal.ts';
 import { createParty, setPartyActive, updateParty, type Party, type PartyKind } from './parties.ts';
 import { err, type Result, ok } from './result.ts';
 import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from './reports.ts';
-import { openInvoices, partyBalances, unpaidBills } from './subledger.ts';
+import { aging, openInvoices, partyBalances, unpaidBills } from './subledger.ts';
 
 export interface CommandSpec {
   id: string;
@@ -158,6 +161,29 @@ commands.push(
   { id: 'report.unpaidBills', label: { en: 'Unpaid Bills', ar: 'فواتير الشراء غير المدفوعة' }, mutates: false, run: (c, p) => unpaidBills(c, p.asOf) },
 );
 
+// Memorized transactions run other commands: for real inside the running command's snapshot, or on
+// a throwaway copy to check a template.
+const runner = (c: Company): Runner => ({
+  run: (id, p) => COMMANDS.get(id)?.run(c, p) ?? err('command.unknown', `Unknown command "${id}".`),
+  dryRun: (id, p) => COMMANDS.get(id)?.run(structuredClone(c), p) ?? err('command.unknown', `Unknown command "${id}".`),
+});
+
+commands.push(
+  { id: 'bank.candidates', label: { en: 'Begin Reconciliation', ar: 'بدء المطابقة' }, mutates: false, run: (c, p) => reconcileCandidates(c, p.accountId, p.statementDate) },
+  { id: 'bank.reconcile', label: { en: 'Reconcile', ar: 'مطابقة الحساب مع الكشف' }, mutates: true, run: (c, p) => reconcile(c, p) },
+  { id: 'bank.undoReconciliation', label: { en: 'Undo Last Reconciliation', ar: 'التراجع عن آخر مطابقة' }, mutates: true, run: (c, p) => undoReconciliation(c, p) },
+  { id: 'report.reconciliation', label: { en: 'Reconciliation Report', ar: 'تقرير المطابقة' }, mutates: false, run: (c, p) => reconciliationReport(c, p.id) },
+  { id: 'report.arAging', label: { en: 'A/R Aging', ar: 'أعمار الذمم المدينة' }, mutates: false, run: (c, p) => aging(c, 'customer', p.asOf, p.interval ?? 30, p.periods ?? 3) },
+  { id: 'report.apAging', label: { en: 'A/P Aging', ar: 'أعمار الذمم الدائنة' }, mutates: false, run: (c, p) => aging(c, 'vendor', p.asOf, p.interval ?? 30, p.periods ?? 3) },
+  { id: 'report.cashFlow', label: { en: 'Statement of Cash Flows', ar: 'قائمة التدفقات النقدية' }, mutates: false, run: (c, p) => cashFlow(c, p.from, p.to) },
+  { id: 'memorized.create', label: { en: 'Memorize Transaction', ar: 'حفظ معاملة متكررة' }, mutates: true, run: (c, p) => createMemorized(c, runner(c), p) },
+  { id: 'memorized.list', label: { en: 'Memorized Transactions', ar: 'المعاملات المحفوظة' }, mutates: false, run: (c): Result<Memorized[]> => ok([...c.memorized.values()]) },
+  { id: 'memorized.run', label: { en: 'Enter Memorized Transaction', ar: 'إدخال معاملة محفوظة' }, mutates: true, run: (c, p) => runMemorized(c, runner(c), p) },
+  { id: 'memorized.runDue', label: { en: 'Enter Scheduled Transactions', ar: 'إدخال المعاملات المستحقة' }, mutates: true, run: (c, p) => runDue(c, runner(c), p) },
+  { id: 'memorized.setActive', label: { en: 'Pause / Resume Schedule', ar: 'إيقاف الجدولة أو استئنافها' }, mutates: true, run: (c, p) => setMemorizedActive(c, p) },
+  { id: 'memorized.delete', label: { en: 'Delete Memorized Transaction', ar: 'حذف المعاملة المحفوظة' }, mutates: true, run: (c, p) => deleteMemorized(c, p) },
+);
+
 function isCustomerSide(c: Company, p: Record<string, unknown>): boolean {
   const d = typeof p.sourceId === 'number' ? c.documents.get(p.sourceId) : undefined;
   return d?.kind === 'payment' || d?.kind === 'credit_memo';
@@ -177,6 +203,9 @@ function snapshot(c: Company): Company {
     items: new Map([...c.items].map(([id, x]) => [id, { ...x }])),
     documents: new Map([...c.documents].map(([id, x]) => [id, { ...x }])),
     applications: c.applications.map((a) => ({ ...a })),
+    reconciliations: c.reconciliations.map((r) => ({ ...r })),
+    cleared: new Map(c.cleared),
+    memorized: new Map([...c.memorized].map(([id, m]) => [id, { ...m }])),
   };
 }
 
@@ -190,8 +219,14 @@ export function execute(c: Company, id: string, params: unknown = {}): Result<un
   const before = spec.mutates ? snapshot(c) : null;
   try {
     const r = spec.run(c, p);
+    // A refused command leaves nothing behind, even one that did some work before refusing
+    // (running a schedule enters several transactions and may fail on the last).
+    if (!r.ok) {
+      if (before) Object.assign(c, before);
+      return r;
+    }
     // Callers get a copy: nothing they do to a result can reach the books.
-    return r.ok ? { ok: true, value: structuredClone(r.value) } : r;
+    return { ok: true, value: structuredClone(r.value) };
   } catch (e) {
     if (before) Object.assign(c, before);
     return err('internal', 'Something went wrong; nothing was changed.', { command: id, cause: String(e) });
