@@ -12,6 +12,13 @@ People will run real businesses on this. A wrong number is worse than a missing 
 - **Every journal entry balances** (sum of debits = sum of credits, per currency) or is rejected.
 - **Reports are derived from posted entries only.** No stored balance that can drift.
 - **Posted entries are never edited or deleted.** Corrections are reversing entries.
+  Posted entries are frozen objects; commands hand out copies, never live state.
+- **Closed periods stay closed.** Moving the closing date earlier needs `reopen: true` and is logged;
+  the fiscal year cannot change while closed periods hold entries.
+- **Every report agrees with every other at every date.** The general ledger restarts income and
+  expense accounts each fiscal year and shows each closed year's profit on Retained Earnings, so
+  its closing balances equal the trial balance (property-tested).
+- **Sums are checked.** A total beyond exact integer range is refused (`amount.too_large`), never rounded.
 - **Golden books:** `core/test/golden/` holds companies computed by hand. Every report must match
   them to the minor unit. A change that moves a golden number is a bug until proven otherwise.
 - Property tests: thousands of random valid transactions → trial balance always zero.

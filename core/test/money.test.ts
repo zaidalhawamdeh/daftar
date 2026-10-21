@@ -55,6 +55,7 @@ test('formatting shows every decimal and groups thousands', () => {
   assert.equal(formatAmount(0, USD), '0.00');
   assert.equal(formatAmount(1234567, JPY), '1,234,567');
   assert.equal(formatAmount(1234567, JOD, { grouping: false }), '1234.567');
+  for (const bad of [1.5, NaN, 1e21, Infinity]) assert.equal(formatAmount(bad, USD), '#AMOUNT?', String(bad));
 });
 
 test('parse and format round-trip', () => {

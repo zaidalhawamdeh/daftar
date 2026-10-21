@@ -18,9 +18,8 @@ export interface Entry {
   id: number;
   date: string;
   memo: string;
-  lines: Line[];
+  lines: readonly Line[];
   reverses: number | null;
-  reversedBy: number | null;
 }
 
 export type Language = 'en' | 'ar';
@@ -31,6 +30,7 @@ export interface Company {
   language: Language;
   fiscalYearStartMonth: number;
   closingDate: string | null;
+  closingDateLog: { from: string | null; to: string | null }[];
   accounts: Map<string, Account>;
   entries: Entry[];
   nextAccountId: number;
@@ -47,15 +47,19 @@ export interface CreateCompanyInput {
 
 const RETAINED_EARNINGS = { en: 'Retained Earnings', ar: 'الأرباح المحتجزة' };
 
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
 function cleanName(v: unknown, max: number, what: string): Result<string> {
   if (typeof v !== 'string') return err(`${what}.invalid`, `${what} must be text.`);
-  const s = v.trim().replace(/\s+/g, ' ');
+  // Invisible characters would let "Rent" and "Rent​" sit side by side.
+  const s = v.replace(/[​-‏‪-‮⁠-⁩﻿]/g, '').trim().replace(/\s+/g, ' ');
   if (!s) return err(`${what}.empty`, `${what} is required.`);
   if (s.length > max) return err(`${what}.too_long`, `${what} is longer than ${max} characters.`);
   return ok(s);
 }
 
 export function createCompany(input: CreateCompanyInput): Result<Company> {
+  if (!isObject(input)) return err('company.invalid', 'Company details are missing.');
   const name = cleanName(input.name, 120, 'company name');
   if (!name.ok) return name;
   const cur = currency(input.currency);
@@ -75,6 +79,7 @@ export function createCompany(input: CreateCompanyInput): Result<Company> {
     language,
     fiscalYearStartMonth: fy,
     closingDate: null,
+    closingDateLog: [],
     accounts: new Map(),
     entries: [],
     nextAccountId: 1,
@@ -104,7 +109,8 @@ export function retainedEarnings(c: Company): Account {
   throw new Error('company has no retained earnings account');
 }
 
-export function findAccount(c: Company, key: string): Account | undefined {
+export function findAccount(c: Company, key: unknown): Account | undefined {
+  if (typeof key !== 'string') return undefined;
   const byId = c.accounts.get(key);
   if (byId) return byId;
   const k = key.trim().toLowerCase();
@@ -179,6 +185,7 @@ function checkSiblingName(c: Company, name: string, parentId: string | null, sel
 }
 
 export function createAccount(c: Company, input: AccountInput): Result<Account> {
+  if (!isObject(input)) return err('account.invalid', 'Account details are missing.');
   const name = cleanName(input.name, 100, 'account name');
   if (!name.ok) return name;
   if (!isAccountType(input.type)) return err('account.type_invalid', 'Unknown account type.', { type: input.type });
@@ -195,6 +202,7 @@ export function createAccount(c: Company, input: AccountInput): Result<Account> 
 export function updateAccount(c: Company, id: unknown, input: AccountInput): Result<Account> {
   const a = typeof id === 'string' ? c.accounts.get(id) : undefined;
   if (!a) return err('account.missing', 'Account does not exist.');
+  if (!isObject(input)) return err('account.invalid', 'Account details are missing.');
   const name = input.name === undefined ? ok(a.name) : cleanName(input.name, 100, 'account name');
   if (!name.ok) return name;
   let type = a.type;
@@ -243,19 +251,28 @@ export function setAccountActive(c: Company, id: unknown, active: unknown): Resu
   return ok(a);
 }
 
-export function setClosingDate(c: Company, date: unknown): Result<string | null> {
-  if (date === null) {
-    c.closingDate = null;
-    return ok(null);
+// Moving the closing date later locks more of the past and needs no confirmation. Moving it earlier
+// or removing it reopens closed periods, so it must be asked for explicitly, and every change is logged.
+export function setClosingDate(c: Company, date: unknown, reopen: unknown = false): Result<string | null> {
+  if (date !== null && !isIsoDate(date)) return err('date.invalid', 'Closing date must be a real date (YYYY-MM-DD).');
+  const reopens = c.closingDate !== null && (date === null || date < c.closingDate);
+  if (reopens && reopen !== true) {
+    return err('closing.reopen', `This reopens periods closed through ${c.closingDate}; confirm to continue.`, { closingDate: c.closingDate });
   }
-  if (!isIsoDate(date)) return err('date.invalid', 'Closing date must be a real date (YYYY-MM-DD).');
+  if (date !== c.closingDate) c.closingDateLog.push({ from: c.closingDate, to: date });
   c.closingDate = date;
   return ok(date);
 }
 
+// Changing the fiscal year restates which profit is "retained" and which is "this year", so it is
+// refused once closed periods hold entries.
 export function setFiscalYearStart(c: Company, month: unknown): Result<number> {
   if (typeof month !== 'number' || !Number.isInteger(month) || month < 1 || month > 12) {
     return err('fiscal_year.invalid', 'Fiscal year must start in month 1 to 12.');
+  }
+  const closed = c.closingDate;
+  if (month !== c.fiscalYearStartMonth && closed !== null && c.entries.some((e) => e.date <= closed)) {
+    return err('fiscal_year.closed', `Periods through ${closed} are closed; reopen them before changing the fiscal year.`);
   }
   c.fiscalYearStartMonth = month;
   return ok(month);

@@ -62,22 +62,26 @@ function westernDigits(s: string): string {
 }
 
 // Accepts "1,234.567", "-12.5", "(12.50)", Arabic-Indic digits and the Arabic separators ٫ ٬.
-// Never rounds: more decimals than the currency has is an error, not a guess.
+// Never guesses: more decimals than the currency has, a comma that is not a thousands separator
+// ("12,50") or a doubled sign is an error, not a reading.
 export function parseAmount(text: unknown, cur: Currency): Result<Minor> {
   if (typeof text !== 'string') return err('amount.invalid', 'Amount must be text.');
-  let s = westernDigits(text.trim()).replace(/٫/g, '.').replace(/[٬,\s  ]/g, '');
+  const invalid = () => err<Minor>('amount.invalid', `"${text}" is not an amount.`, { text });
+  let s = westernDigits(text.trim()).replace(/٫/g, '.').replace(/[٬   ]/g, ',');
   let negative = false;
   if (s.startsWith('(') && s.endsWith(')')) {
     negative = true;
-    s = s.slice(1, -1);
+    s = s.slice(1, -1).trim();
   }
   if (s.startsWith('-') || s.startsWith('−')) {
-    negative = !negative;
+    if (negative) return invalid();
+    negative = true;
     s = s.slice(1);
   }
-  if (!/^\d+(\.\d+)?$/.test(s) && !/^\.\d+$/.test(s)) {
-    return err('amount.invalid', `"${text}" is not an amount.`, { text });
-  }
+  const grouped = /^\d{1,3}(,\d{3})+(\.\d+)?$/;
+  const plain = /^(\d+(\.\d+)?|\.\d+)$/;
+  if (!plain.test(s) && !grouped.test(s)) return invalid();
+  s = s.replace(/,/g, '');
   const [intPart = '', fracPart = ''] = s.split('.');
   if (fracPart.length > cur.digits) {
     return err('amount.too_precise', `${cur.code} has ${cur.digits} decimal places.`, { text, digits: cur.digits });
@@ -88,7 +92,11 @@ export function parseAmount(text: unknown, cur: Currency): Result<Minor> {
   return ok(negative && n !== 0 ? -n : n);
 }
 
+// A non-integer here is a bug upstream; show it plainly rather than print a plausible wrong number.
+export const INVALID_AMOUNT = '#AMOUNT?';
+
 export function formatAmount(m: Minor, cur: Currency, opts: { grouping?: boolean } = {}): string {
+  if (!isMinor(m)) return INVALID_AMOUNT;
   const grouping = opts.grouping ?? true;
   const negative = m < 0;
   const raw = String(Math.abs(m)).padStart(cur.digits + 1, '0');

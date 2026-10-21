@@ -71,15 +71,26 @@ export function validateEntry(c: Company, input: EntryInput): Result<Omit<Entry,
       credits,
     });
   }
-  return ok({ date: date.value, memo: memo.value, lines, reverses: null, reversedBy: null });
+  return ok({ date: date.value, memo: memo.value, lines, reverses: null });
+}
+
+// Posted entries are frozen: nothing, inside or outside the core, can edit one after the fact.
+function freeze(e: Entry): Entry {
+  for (const l of e.lines) Object.freeze(l);
+  Object.freeze(e.lines);
+  return Object.freeze(e);
 }
 
 export function postEntry(c: Company, input: EntryInput): Result<Entry> {
   const v = validateEntry(c, input);
   if (!v.ok) return v;
-  const entry: Entry = { id: c.nextEntryId++, ...v.value };
+  const entry = freeze({ id: c.nextEntryId++, ...v.value });
   c.entries.push(entry);
   return ok(entry);
+}
+
+export function reversalOf(c: Company, entryId: number): Entry | undefined {
+  return c.entries.find((e) => e.reverses === entryId);
 }
 
 export interface ReverseInput {
@@ -89,9 +100,11 @@ export interface ReverseInput {
 }
 
 export function reverseEntry(c: Company, input: ReverseInput): Result<Entry> {
+  if (typeof input !== 'object' || input === null) return err('entry.invalid', 'Reversal details are missing.');
   const original = c.entries.find((e) => e.id === input.entryId);
   if (!original) return err('entry.missing', 'Entry does not exist.');
-  if (original.reversedBy !== null) return err('entry.already_reversed', `Entry ${original.id} is already reversed by entry ${original.reversedBy}.`);
+  const existing = reversalOf(c, original.id);
+  if (existing) return err('entry.already_reversed', `Entry ${original.id} is already reversed by entry ${existing.id}.`);
   if (original.reverses !== null) return err('entry.is_reversal', `Entry ${original.id} is itself a reversal; post a new entry instead.`);
   const date = checkDate(c, input.date);
   if (!date.ok) return date;
@@ -102,15 +115,13 @@ export function reverseEntry(c: Company, input: ReverseInput): Result<Entry> {
   }
   const memo = memoOf(input.memo ?? `Reversal of entry ${original.id}`);
   if (!memo.ok) return memo;
-  const entry: Entry = {
+  const entry = freeze({
     id: c.nextEntryId++,
     date: date.value,
     memo: memo.value,
     lines: original.lines.map((l) => ({ accountId: l.accountId, debit: l.credit, credit: l.debit, memo: l.memo })),
     reverses: original.id,
-    reversedBy: null,
-  };
+  });
   c.entries.push(entry);
-  original.reversedBy = entry.id;
   return ok(entry);
 }

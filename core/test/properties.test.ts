@@ -2,10 +2,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { normalSide } from '../accounts.ts';
+import { execute } from '../commands.ts';
 import { createCompany, type Company } from '../company.ts';
 import { fiscalYearStart } from '../dates.ts';
 import { postEntry, reverseEntry } from '../journal.ts';
-import { balanceSheet, profitAndLoss, trialBalance } from '../reports.ts';
+import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from '../reports.ts';
 
 // Small seeded generator so a failure can be replayed.
 function rng(seed: number) {
@@ -99,6 +101,53 @@ test('retained earnings grow by exactly each closed year’s net income', () => 
       assert.ok(pl.ok && before.ok && after.ok);
       assert.equal(after.value.equity.extra.retainedEarnings - before.value.equity.extra.retainedEarnings, pl.value.netIncome, `seed ${seed}, ${y}`);
     }
+  }
+});
+
+test('general ledger closing balances equal the trial balance on the end date, for any range', () => {
+  for (const seed of SEEDS.slice(0, 150)) {
+    const { c, dates } = randomBooks(seed);
+    const sorted = [...dates].sort();
+    for (let k = 0; k < 4; k++) {
+      const from = sorted[(k * 7) % sorted.length]!;
+      const to = sorted[Math.min(sorted.length - 1, (k * 7) % sorted.length + 1 + k * 11)]!;
+      if (from > to) continue;
+      const gl = generalLedger(c, from, to);
+      const tb = trialBalance(c, to);
+      assert.ok(gl.ok && tb.ok);
+      const expected = new Map(tb.value.rows.map((r) => [r.accountId, r.debit - r.credit]));
+      for (const a of gl.value) {
+        const debitPositive = normalSide(a.type) === 'debit' ? a.closing : 0 - a.closing;
+        assert.equal(debitPositive, expected.get(a.accountId) ?? 0, `seed ${seed}, ${a.number} ${from}..${to}`);
+        expected.delete(a.accountId);
+      }
+      assert.deepEqual([...expected.values()].filter((v) => v !== 0), [], `seed ${seed}: accounts missing from the ledger`);
+    }
+  }
+});
+
+test('moving accounts under new parents and deactivating them never breaks roll-ups', () => {
+  for (const seed of SEEDS.slice(0, 100)) {
+    const { c, rand } = randomBooks(seed);
+    const all = () => [...c.accounts.values()];
+    for (let i = 0; i < 40; i++) {
+      const a = all()[Math.floor(rand() * c.accounts.size)]!;
+      const p = all()[Math.floor(rand() * c.accounts.size)]!;
+      if (rand() < 0.7) execute(c, 'account.update', { id: a.id, parentId: rand() < 0.2 ? null : p.id });
+      else execute(c, 'account.setActive', { id: a.id, active: rand() < 0.5 });
+    }
+    const d = '2026-12-31';
+    const pl = profitAndLoss(c, '2024-01-01', d);
+    const bs = balanceSheet(c, d);
+    assert.ok(pl.ok && bs.ok);
+    for (const s of [pl.value.income, pl.value.costOfGoodsSold, pl.value.expenses, pl.value.otherIncome, pl.value.otherExpenses]) {
+      assert.equal(s.rows.reduce((t, r) => t + r.amount, 0), s.total, `seed ${seed}: section total is the sum of its rows`);
+      for (const r of s.rows) {
+        const kids = s.rows.filter((k) => c.accounts.get(k.accountId)?.parentId === r.accountId);
+        assert.equal(r.total, r.amount + kids.reduce((t, k) => t + k.total, 0), `seed ${seed}: ${r.name} rolls up its sub-accounts`);
+      }
+    }
+    assert.equal(bs.value.assets.total, bs.value.totalLiabilitiesAndEquity, `seed ${seed}`);
   }
 });
 
