@@ -1,0 +1,21 @@
+{
+  "name": "daftar",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Clean-room, open-source, offline-first accounting for small businesses.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test \"core/**/*.test.ts\" \"catalog/**/*.test.ts\"",
+    "typecheck": "tsc -p .",
+    "parity": "node scripts/parity.ts",
+    "check": "npm run typecheck && npm test && node scripts/parity.ts --check"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3"
+  }
+}

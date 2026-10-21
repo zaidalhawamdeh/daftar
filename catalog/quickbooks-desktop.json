@@ -1,0 +1,906 @@
+{
+ "about": "QuickBooks Desktop feature catalog: feature names only, in our own words, describing workflows we aim to match. Drafted 2026-10-21 from general knowledge of the product's public feature set. An entry counts as verified only once it carries `ref`, a link to a public Intuit help page. `command` is the Daftar command that delivers the feature, or null.",
+ "verified": false,
+ "features": [
+  {
+   "id": "company.create-a-new-company-file",
+   "area": "company",
+   "feature": "Create a new company file",
+   "command": "company.create"
+  },
+  {
+   "id": "company.company-information-name-address-tax-id",
+   "area": "company",
+   "feature": "Company information (name, address, tax ID)",
+   "command": null
+  },
+  {
+   "id": "company.fiscal-year-start-month",
+   "area": "company",
+   "feature": "Fiscal year start month",
+   "command": "company.setFiscalYearStart"
+  },
+  {
+   "id": "company.closing-date-lock-earlier-periods",
+   "area": "company",
+   "feature": "Closing date (lock earlier periods)",
+   "command": "company.setClosingDate"
+  },
+  {
+   "id": "company.closing-date-password-and-exceptions-report",
+   "area": "company",
+   "feature": "Closing date password and exceptions report",
+   "command": null
+  },
+  {
+   "id": "company.multiple-users-with-roles-and-permissions",
+   "area": "company",
+   "feature": "Multiple users with roles and permissions",
+   "command": null
+  },
+  {
+   "id": "company.single-user-and-multi-user-mode",
+   "area": "company",
+   "feature": "Single-user and multi-user mode",
+   "command": null
+  },
+  {
+   "id": "company.audit-trail-of-every-change",
+   "area": "company",
+   "feature": "Audit trail of every change",
+   "command": null
+  },
+  {
+   "id": "company.back-up-company-file",
+   "area": "company",
+   "feature": "Back up company file",
+   "command": null
+  },
+  {
+   "id": "company.restore-company-file",
+   "area": "company",
+   "feature": "Restore company file",
+   "command": null
+  },
+  {
+   "id": "company.automatic-scheduled-backups",
+   "area": "company",
+   "feature": "Automatic scheduled backups",
+   "command": null
+  },
+  {
+   "id": "company.verify-and-rebuild-data",
+   "area": "company",
+   "feature": "Verify and rebuild data",
+   "command": null
+  },
+  {
+   "id": "company.condense-data-archive-old-years",
+   "area": "company",
+   "feature": "Condense data (archive old years)",
+   "command": null
+  },
+  {
+   "id": "company.preferences-decimals-dates-numbering",
+   "area": "company",
+   "feature": "Preferences: decimals, dates, numbering",
+   "command": null
+  },
+  {
+   "id": "company.reminders-bills-due-invoices-overdue",
+   "area": "company",
+   "feature": "Reminders (bills due, invoices overdue)",
+   "command": null
+  },
+  {
+   "id": "company.to-do-list-and-notes",
+   "area": "company",
+   "feature": "To-do list and notes",
+   "command": null
+  },
+  {
+   "id": "company.company-snapshot-dashboard",
+   "area": "company",
+   "feature": "Company snapshot dashboard",
+   "command": null
+  },
+  {
+   "id": "company.calendar-of-transactions",
+   "area": "company",
+   "feature": "Calendar of transactions",
+   "command": null
+  },
+  {
+   "id": "company.memorized-saved-transactions",
+   "area": "company",
+   "feature": "Memorized (saved) transactions",
+   "command": null
+  },
+  {
+   "id": "company.recurring-memorized-transactions-on-a-schedule",
+   "area": "company",
+   "feature": "Recurring memorized transactions on a schedule",
+   "command": null
+  },
+  {
+   "id": "lists.chart-of-accounts",
+   "area": "lists",
+   "feature": "Chart of accounts",
+   "command": "account.list"
+  },
+  {
+   "id": "lists.new-account",
+   "area": "lists",
+   "feature": "New account",
+   "command": "account.create"
+  },
+  {
+   "id": "lists.edit-account",
+   "area": "lists",
+   "feature": "Edit account",
+   "command": "account.update"
+  },
+  {
+   "id": "lists.make-account-inactive-or-active",
+   "area": "lists",
+   "feature": "Make account inactive or active",
+   "command": "account.setActive"
+  },
+  {
+   "id": "lists.sub-accounts-nested-accounts",
+   "area": "lists",
+   "feature": "Sub-accounts (nested accounts)",
+   "command": "account.create"
+  },
+  {
+   "id": "lists.account-numbers",
+   "area": "lists",
+   "feature": "Account numbers",
+   "command": "account.create"
+  },
+  {
+   "id": "lists.merge-two-accounts",
+   "area": "lists",
+   "feature": "Merge two accounts",
+   "command": null
+  },
+  {
+   "id": "lists.delete-unused-account",
+   "area": "lists",
+   "feature": "Delete unused account",
+   "command": null
+  },
+  {
+   "id": "lists.item-list-products-and-services",
+   "area": "lists",
+   "feature": "Item list (products and services)",
+   "command": null
+  },
+  {
+   "id": "lists.item-types-service-non-inventory-inventory-other-charge",
+   "area": "lists",
+   "feature": "Item types: service, non-inventory, inventory, other charge, discount, group",
+   "command": null
+  },
+  {
+   "id": "lists.classes-track-by-department-or-location",
+   "area": "lists",
+   "feature": "Classes (track by department or location)",
+   "command": null
+  },
+  {
+   "id": "lists.price-levels",
+   "area": "lists",
+   "feature": "Price levels",
+   "command": null
+  },
+  {
+   "id": "lists.sales-tax-items-and-groups",
+   "area": "lists",
+   "feature": "Sales tax items and groups",
+   "command": null
+  },
+  {
+   "id": "lists.payment-terms",
+   "area": "lists",
+   "feature": "Payment terms",
+   "command": null
+  },
+  {
+   "id": "lists.payment-methods",
+   "area": "lists",
+   "feature": "Payment methods",
+   "command": null
+  },
+  {
+   "id": "lists.customer-and-vendor-types",
+   "area": "lists",
+   "feature": "Customer and vendor types",
+   "command": null
+  },
+  {
+   "id": "lists.ship-via-list",
+   "area": "lists",
+   "feature": "Ship via list",
+   "command": null
+  },
+  {
+   "id": "lists.custom-fields-on-names-and-items",
+   "area": "lists",
+   "feature": "Custom fields on names and items",
+   "command": null
+  },
+  {
+   "id": "lists.import-lists-from-excel-or-csv",
+   "area": "lists",
+   "feature": "Import lists from Excel or CSV",
+   "command": null
+  },
+  {
+   "id": "customers.customer-center-list-balances-history",
+   "area": "customers",
+   "feature": "Customer center (list, balances, history)",
+   "command": null
+  },
+  {
+   "id": "customers.customer-jobs-and-projects",
+   "area": "customers",
+   "feature": "Customer jobs and projects",
+   "command": null
+  },
+  {
+   "id": "customers.estimates-and-quotes",
+   "area": "customers",
+   "feature": "Estimates and quotes",
+   "command": null
+  },
+  {
+   "id": "customers.convert-estimate-to-invoice",
+   "area": "customers",
+   "feature": "Convert estimate to invoice",
+   "command": null
+  },
+  {
+   "id": "customers.progress-invoicing-from-estimates",
+   "area": "customers",
+   "feature": "Progress invoicing from estimates",
+   "command": null
+  },
+  {
+   "id": "customers.sales-orders",
+   "area": "customers",
+   "feature": "Sales orders",
+   "command": null
+  },
+  {
+   "id": "customers.invoices",
+   "area": "customers",
+   "feature": "Invoices",
+   "command": null
+  },
+  {
+   "id": "customers.invoice-templates-and-print-layout",
+   "area": "customers",
+   "feature": "Invoice templates and print layout",
+   "command": null
+  },
+  {
+   "id": "customers.batch-invoicing",
+   "area": "customers",
+   "feature": "Batch invoicing",
+   "command": null
+  },
+  {
+   "id": "customers.sales-receipts-paid-on-the-spot",
+   "area": "customers",
+   "feature": "Sales receipts (paid on the spot)",
+   "command": null
+  },
+  {
+   "id": "customers.statement-charges",
+   "area": "customers",
+   "feature": "Statement charges",
+   "command": null
+  },
+  {
+   "id": "customers.customer-statements",
+   "area": "customers",
+   "feature": "Customer statements",
+   "command": null
+  },
+  {
+   "id": "customers.receive-payments",
+   "area": "customers",
+   "feature": "Receive payments",
+   "command": null
+  },
+  {
+   "id": "customers.apply-one-payment-to-several-invoices",
+   "area": "customers",
+   "feature": "Apply one payment to several invoices",
+   "command": null
+  },
+  {
+   "id": "customers.early-payment-discounts",
+   "area": "customers",
+   "feature": "Early-payment discounts",
+   "command": null
+  },
+  {
+   "id": "customers.partial-payments",
+   "area": "customers",
+   "feature": "Partial payments",
+   "command": null
+  },
+  {
+   "id": "customers.overpayments-and-customer-credits",
+   "area": "customers",
+   "feature": "Overpayments and customer credits",
+   "command": null
+  },
+  {
+   "id": "customers.credit-memos-and-refunds",
+   "area": "customers",
+   "feature": "Credit memos and refunds",
+   "command": null
+  },
+  {
+   "id": "customers.undeposited-funds-and-make-deposits",
+   "area": "customers",
+   "feature": "Undeposited funds and make deposits",
+   "command": null
+  },
+  {
+   "id": "customers.finance-charges-on-overdue-balances",
+   "area": "customers",
+   "feature": "Finance charges on overdue balances",
+   "command": null
+  },
+  {
+   "id": "customers.customer-credit-limits",
+   "area": "customers",
+   "feature": "Customer credit limits",
+   "command": null
+  },
+  {
+   "id": "customers.write-off-bad-debt",
+   "area": "customers",
+   "feature": "Write off bad debt",
+   "command": null
+  },
+  {
+   "id": "customers.email-invoices-and-statements",
+   "area": "customers",
+   "feature": "Email invoices and statements",
+   "command": null
+  },
+  {
+   "id": "customers.time-tracking-and-billable-time",
+   "area": "customers",
+   "feature": "Time tracking and billable time",
+   "command": null
+  },
+  {
+   "id": "customers.billable-expenses-passed-to-customers",
+   "area": "customers",
+   "feature": "Billable expenses passed to customers",
+   "command": null
+  },
+  {
+   "id": "vendors.vendor-center-list-balances-history",
+   "area": "vendors",
+   "feature": "Vendor center (list, balances, history)",
+   "command": null
+  },
+  {
+   "id": "vendors.purchase-orders",
+   "area": "vendors",
+   "feature": "Purchase orders",
+   "command": null
+  },
+  {
+   "id": "vendors.receive-items-against-a-purchase-order",
+   "area": "vendors",
+   "feature": "Receive items against a purchase order",
+   "command": null
+  },
+  {
+   "id": "vendors.enter-bills",
+   "area": "vendors",
+   "feature": "Enter bills",
+   "command": null
+  },
+  {
+   "id": "vendors.pay-bills",
+   "area": "vendors",
+   "feature": "Pay bills",
+   "command": null
+  },
+  {
+   "id": "vendors.partial-bill-payments",
+   "area": "vendors",
+   "feature": "Partial bill payments",
+   "command": null
+  },
+  {
+   "id": "vendors.vendor-credits",
+   "area": "vendors",
+   "feature": "Vendor credits",
+   "command": null
+  },
+  {
+   "id": "vendors.bill-due-dates-and-terms",
+   "area": "vendors",
+   "feature": "Bill due dates and terms",
+   "command": null
+  },
+  {
+   "id": "vendors.write-checks-and-record-expenses",
+   "area": "vendors",
+   "feature": "Write checks and record expenses",
+   "command": null
+  },
+  {
+   "id": "vendors.print-checks",
+   "area": "vendors",
+   "feature": "Print checks",
+   "command": null
+  },
+  {
+   "id": "vendors.credit-card-charges-and-credits",
+   "area": "vendors",
+   "feature": "Credit card charges and credits",
+   "command": null
+  },
+  {
+   "id": "vendors.1099-contractor-tracking",
+   "area": "vendors",
+   "feature": "1099 contractor tracking",
+   "command": null
+  },
+  {
+   "id": "vendors.pay-sales-tax-liability",
+   "area": "vendors",
+   "feature": "Pay sales tax liability",
+   "command": null
+  },
+  {
+   "id": "banking.bank-and-cash-accounts",
+   "area": "banking",
+   "feature": "Bank and cash accounts",
+   "command": "account.create"
+  },
+  {
+   "id": "banking.make-deposits",
+   "area": "banking",
+   "feature": "Make deposits",
+   "command": null
+  },
+  {
+   "id": "banking.transfer-funds-between-accounts",
+   "area": "banking",
+   "feature": "Transfer funds between accounts",
+   "command": null
+  },
+  {
+   "id": "banking.bank-register-with-running-balance",
+   "area": "banking",
+   "feature": "Bank register with running balance",
+   "command": null
+  },
+  {
+   "id": "banking.reconcile-bank-account-against-statement",
+   "area": "banking",
+   "feature": "Reconcile bank account against statement",
+   "command": null
+  },
+  {
+   "id": "banking.reconcile-credit-card-account",
+   "area": "banking",
+   "feature": "Reconcile credit card account",
+   "command": null
+  },
+  {
+   "id": "banking.undo-last-reconciliation",
+   "area": "banking",
+   "feature": "Undo last reconciliation",
+   "command": null
+  },
+  {
+   "id": "banking.reconciliation-discrepancy-report",
+   "area": "banking",
+   "feature": "Reconciliation discrepancy report",
+   "command": null
+  },
+  {
+   "id": "banking.import-bank-statement-file-ofx-qfx-csv",
+   "area": "banking",
+   "feature": "Import bank statement file (OFX, QFX, CSV)",
+   "command": null
+  },
+  {
+   "id": "banking.bank-rules-to-categorize-transactions",
+   "area": "banking",
+   "feature": "Bank rules to categorize transactions",
+   "command": null
+  },
+  {
+   "id": "banking.loan-manager-amortization",
+   "area": "banking",
+   "feature": "Loan manager (amortization)",
+   "command": null
+  },
+  {
+   "id": "banking.petty-cash",
+   "area": "banking",
+   "feature": "Petty cash",
+   "command": null
+  },
+  {
+   "id": "accounting.make-general-journal-entries",
+   "area": "accounting",
+   "feature": "Make general journal entries",
+   "command": "journal.post"
+  },
+  {
+   "id": "accounting.reverse-a-journal-entry",
+   "area": "accounting",
+   "feature": "Reverse a journal entry",
+   "command": "journal.reverse"
+  },
+  {
+   "id": "accounting.journal-all-transactions",
+   "area": "accounting",
+   "feature": "Journal (all transactions)",
+   "command": "journal.list"
+  },
+  {
+   "id": "accounting.void-a-transaction",
+   "area": "accounting",
+   "feature": "Void a transaction",
+   "command": null
+  },
+  {
+   "id": "accounting.opening-balances",
+   "area": "accounting",
+   "feature": "Opening balances",
+   "command": null
+  },
+  {
+   "id": "accounting.automatic-retained-earnings-at-year-end",
+   "area": "accounting",
+   "feature": "Automatic retained earnings at year end",
+   "command": "report.balanceSheet"
+  },
+  {
+   "id": "accounting.accrual-and-cash-basis-reporting",
+   "area": "accounting",
+   "feature": "Accrual and cash basis reporting",
+   "command": null
+  },
+  {
+   "id": "accounting.multiple-currencies",
+   "area": "accounting",
+   "feature": "Multiple currencies",
+   "command": null
+  },
+  {
+   "id": "accounting.exchange-rate-revaluation",
+   "area": "accounting",
+   "feature": "Exchange rate revaluation",
+   "command": null
+  },
+  {
+   "id": "accounting.budgets",
+   "area": "accounting",
+   "feature": "Budgets",
+   "command": null
+  },
+  {
+   "id": "accounting.forecasts",
+   "area": "accounting",
+   "feature": "Forecasts",
+   "command": null
+  },
+  {
+   "id": "accounting.fixed-asset-register",
+   "area": "accounting",
+   "feature": "Fixed asset register",
+   "command": null
+  },
+  {
+   "id": "accounting.depreciation-schedules",
+   "area": "accounting",
+   "feature": "Depreciation schedules",
+   "command": null
+  },
+  {
+   "id": "inventory.inventory-items-with-quantity-on-hand",
+   "area": "inventory",
+   "feature": "Inventory items with quantity on hand",
+   "command": null
+  },
+  {
+   "id": "inventory.average-cost-valuation",
+   "area": "inventory",
+   "feature": "Average cost valuation",
+   "command": null
+  },
+  {
+   "id": "inventory.inventory-adjustments-quantity-and-value",
+   "area": "inventory",
+   "feature": "Inventory adjustments (quantity and value)",
+   "command": null
+  },
+  {
+   "id": "inventory.reorder-points",
+   "area": "inventory",
+   "feature": "Reorder points",
+   "command": null
+  },
+  {
+   "id": "inventory.assemblies-and-builds",
+   "area": "inventory",
+   "feature": "Assemblies and builds",
+   "command": null
+  },
+  {
+   "id": "inventory.multiple-locations-and-sites",
+   "area": "inventory",
+   "feature": "Multiple locations and sites",
+   "command": null
+  },
+  {
+   "id": "inventory.serial-and-lot-numbers",
+   "area": "inventory",
+   "feature": "Serial and lot numbers",
+   "command": null
+  },
+  {
+   "id": "inventory.physical-inventory-worksheet",
+   "area": "inventory",
+   "feature": "Physical inventory worksheet",
+   "command": null
+  },
+  {
+   "id": "payroll.employee-center",
+   "area": "payroll",
+   "feature": "Employee center",
+   "command": null
+  },
+  {
+   "id": "payroll.pay-employees-paychecks",
+   "area": "payroll",
+   "feature": "Pay employees (paychecks)",
+   "command": null
+  },
+  {
+   "id": "payroll.payroll-items-wages-deductions-contributions",
+   "area": "payroll",
+   "feature": "Payroll items: wages, deductions, contributions",
+   "command": null
+  },
+  {
+   "id": "payroll.payroll-liabilities",
+   "area": "payroll",
+   "feature": "Payroll liabilities",
+   "command": null
+  },
+  {
+   "id": "payroll.payroll-reports",
+   "area": "payroll",
+   "feature": "Payroll reports",
+   "command": null
+  },
+  {
+   "id": "reports.trial-balance",
+   "area": "reports",
+   "feature": "Trial balance",
+   "command": "report.trialBalance"
+  },
+  {
+   "id": "reports.profit-and-loss",
+   "area": "reports",
+   "feature": "Profit and loss",
+   "command": "report.profitAndLoss"
+  },
+  {
+   "id": "reports.balance-sheet",
+   "area": "reports",
+   "feature": "Balance sheet",
+   "command": "report.balanceSheet"
+  },
+  {
+   "id": "reports.general-ledger",
+   "area": "reports",
+   "feature": "General ledger",
+   "command": "report.generalLedger"
+  },
+  {
+   "id": "reports.profit-and-loss-compared-to-previous-period",
+   "area": "reports",
+   "feature": "Profit and loss compared to previous period",
+   "command": null
+  },
+  {
+   "id": "reports.profit-and-loss-by-class-or-by-job",
+   "area": "reports",
+   "feature": "Profit and loss by class or by job",
+   "command": null
+  },
+  {
+   "id": "reports.profit-and-loss-with-monthly-columns",
+   "area": "reports",
+   "feature": "Profit and loss with monthly columns",
+   "command": null
+  },
+  {
+   "id": "reports.balance-sheet-comparison",
+   "area": "reports",
+   "feature": "Balance sheet comparison",
+   "command": null
+  },
+  {
+   "id": "reports.statement-of-cash-flows",
+   "area": "reports",
+   "feature": "Statement of cash flows",
+   "command": null
+  },
+  {
+   "id": "reports.a-r-aging-summary",
+   "area": "reports",
+   "feature": "A/R aging summary",
+   "command": null
+  },
+  {
+   "id": "reports.a-r-aging-detail",
+   "area": "reports",
+   "feature": "A/R aging detail",
+   "command": null
+  },
+  {
+   "id": "reports.a-p-aging-summary",
+   "area": "reports",
+   "feature": "A/P aging summary",
+   "command": null
+  },
+  {
+   "id": "reports.a-p-aging-detail",
+   "area": "reports",
+   "feature": "A/P aging detail",
+   "command": null
+  },
+  {
+   "id": "reports.open-invoices",
+   "area": "reports",
+   "feature": "Open invoices",
+   "command": null
+  },
+  {
+   "id": "reports.unpaid-bills",
+   "area": "reports",
+   "feature": "Unpaid bills",
+   "command": null
+  },
+  {
+   "id": "reports.customer-balance-summary-and-detail",
+   "area": "reports",
+   "feature": "Customer balance summary and detail",
+   "command": null
+  },
+  {
+   "id": "reports.vendor-balance-summary-and-detail",
+   "area": "reports",
+   "feature": "Vendor balance summary and detail",
+   "command": null
+  },
+  {
+   "id": "reports.sales-by-customer-and-by-item",
+   "area": "reports",
+   "feature": "Sales by customer and by item",
+   "command": null
+  },
+  {
+   "id": "reports.purchases-by-vendor-and-by-item",
+   "area": "reports",
+   "feature": "Purchases by vendor and by item",
+   "command": null
+  },
+  {
+   "id": "reports.inventory-valuation-summary-and-detail",
+   "area": "reports",
+   "feature": "Inventory valuation summary and detail",
+   "command": null
+  },
+  {
+   "id": "reports.sales-tax-liability",
+   "area": "reports",
+   "feature": "Sales tax liability",
+   "command": null
+  },
+  {
+   "id": "reports.transaction-detail-by-account",
+   "area": "reports",
+   "feature": "Transaction detail by account",
+   "command": null
+  },
+  {
+   "id": "reports.journal-report",
+   "area": "reports",
+   "feature": "Journal report",
+   "command": null
+  },
+  {
+   "id": "reports.audit-trail-report",
+   "area": "reports",
+   "feature": "Audit trail report",
+   "command": null
+  },
+  {
+   "id": "reports.budget-vs-actual",
+   "area": "reports",
+   "feature": "Budget vs actual",
+   "command": null
+  },
+  {
+   "id": "reports.customize-report-dates-columns-and-filters",
+   "area": "reports",
+   "feature": "Customize report dates, columns and filters",
+   "command": null
+  },
+  {
+   "id": "reports.memorized-reports",
+   "area": "reports",
+   "feature": "Memorized reports",
+   "command": null
+  },
+  {
+   "id": "reports.export-report-to-excel-or-csv",
+   "area": "reports",
+   "feature": "Export report to Excel or CSV",
+   "command": null
+  },
+  {
+   "id": "reports.print-or-pdf-any-report-or-form",
+   "area": "reports",
+   "feature": "Print or PDF any report or form",
+   "command": null
+  },
+  {
+   "id": "reports.drill-down-from-a-report-to-the-transaction",
+   "area": "reports",
+   "feature": "Drill down from a report to the transaction",
+   "command": null
+  },
+  {
+   "id": "data.export-lists-and-transactions-iif",
+   "area": "data",
+   "feature": "Export lists and transactions (IIF)",
+   "command": null
+  },
+  {
+   "id": "data.import-iif-file",
+   "area": "data",
+   "feature": "Import IIF file",
+   "command": null
+  },
+  {
+   "id": "data.import-from-quickbooks-exports-excel-csv",
+   "area": "data",
+   "feature": "Import from QuickBooks exports (Excel, CSV)",
+   "command": null
+  },
+  {
+   "id": "data.search-all-transactions",
+   "area": "data",
+   "feature": "Search all transactions",
+   "command": null
+  },
+  {
+   "id": "data.find-by-amount-date-name-or-number",
+   "area": "data",
+   "feature": "Find by amount, date, name or number",
+   "command": null
+  }
+ ]
+}
