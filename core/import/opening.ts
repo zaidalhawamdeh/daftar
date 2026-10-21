@@ -120,8 +120,8 @@ export function importOpeningBalances(c: Company, input: { date: unknown; trialB
     }
     if (amount !== 0) lines.push({ accountId: a.id, type: a.type, amount });
   }
-  if (!lines.length) return err('opening.tb_empty', 'The trial balance has no amounts.');
   if (missing.length) return err('opening.accounts_missing', `These accounts are not in the chart of accounts yet: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? '…' : ''}.`, { missing });
+  if (!lines.length) return err('opening.tb_empty', 'The trial balance has no amounts.');
 
   const obe = [...c.accounts.values()].find((a) => a.type === 'equity' && ['opening balance equity', 'حقوق ملكية الأرصدة الافتتاحية'].includes(a.name.toLowerCase()));
   let obeId = obe?.id;

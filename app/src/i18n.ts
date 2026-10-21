@@ -41,7 +41,7 @@ const AR: Record<string, string> = {
   'Open invoices': 'الفواتير المفتوحة',
   'Unpaid bills': 'فواتير الشراء غير المدفوعة',
   'Export to QuickBooks (IIF)': 'تصدير إلى QuickBooks (IIF)',
-  'In QuickBooks Desktop: File → Utilities → Export → Lists and transactions to IIF files.': 'في QuickBooks Desktop: ملف ← أدوات ← تصدير ← القوائم والمعاملات إلى ملفات IIF.',
+  'In QuickBooks Desktop: File → Utilities → Export → Lists to IIF Files. QuickBooks exports lists only; bring your balances in with the Opening balances (CSV) tab. Transactions in IIF files made by other programs are imported too.': 'في QuickBooks Desktop: ملف ← أدوات ← تصدير ← القوائم إلى ملفات IIF. يصدّر QuickBooks القوائم فقط؛ أدخل أرصدتك من تبويب «الأرصدة الافتتاحية (CSV)». وتُستورد كذلك المعاملات في ملفات IIF التي تنتجها برامج أخرى.',
   'Export these reports as CSV on the date you start: Trial Balance, Open Invoices, Unpaid Bills. Accounts must exist first.': 'صدّر هذه التقارير بصيغة CSV بتاريخ البداية: ميزان المراجعة، الفواتير المفتوحة، فواتير الشراء غير المدفوعة. يجب أن تكون الحسابات موجودة أولاً.',
   // welcome
   'Open-source accounting that stays on your computer.': 'محاسبة مفتوحة المصدر، تبقى على جهازك.',

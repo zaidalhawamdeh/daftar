@@ -22,8 +22,8 @@ People will run real businesses on this. A wrong number is worse than a missing 
   A plain journal entry cannot touch them, and a document's entry is undone only by voiding the
   document. So A/R = customer balances = open invoices − unapplied credits at every date (fuzzed).
 - **Sums are checked.** A total beyond exact integer range is refused (`amount.too_large`), never rounded.
-- **Golden books:** `core/test/golden/` holds companies computed by hand. Every report must match
-  them to the minor unit. A change that moves a golden number is a bug until proven otherwise.
+- **Golden books:** `core/test/golden/` holds companies computed by hand (the IIF golden file is
+  inline in `core/test/iif.test.ts`). Every report must match them to the minor unit. A change that moves a golden number is a bug until proven otherwise.
 - Property tests: thousands of random valid transactions → trial balance always zero.
 
 ## Never crash, never lose data

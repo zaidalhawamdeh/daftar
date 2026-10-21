@@ -64,7 +64,7 @@ export function Import({ c }: { c: Company }) {
       <div class="card">
         {mode === 'iif' && (
           <>
-            <p class="muted">{t('In QuickBooks Desktop: File → Utilities → Export → Lists and transactions to IIF files.')}</p>
+            <p class="muted">{t('In QuickBooks Desktop: File → Utilities → Export → Lists to IIF Files. QuickBooks exports lists only; bring your balances in with the Opening balances (CSV) tab. Transactions in IIF files made by other programs are imported too.')}</p>
             <Field label="IIF"><input type="file" accept=".iif,.txt" onChange={file(setIif)} /></Field>
           </>
         )}
