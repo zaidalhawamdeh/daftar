@@ -4,3 +4,8 @@ node_modules/
 .claude/settings.local.json
 dist/
 release/
+
+# Kept private: the owner's plan, launch drafts and local tool settings
+PLAN.md
+docs/launch/
+.claude/
