@@ -1,0 +1,7 @@
+# Uploaded as .htaccess in the web app's folder. The page, sw.js and manifest are revalidated on
+# every visit so an update reaches people at once; assets/ (hashed names) is cached for a year.
+AddType text/javascript .js
+AddType application/manifest+json .webmanifest
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-cache"
+</IfModule>

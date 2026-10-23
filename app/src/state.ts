@@ -43,11 +43,16 @@ const remember = (k: string, v: string) => {
   }
 };
 
+// A link may name the language (the Arabic page on the website opens the app with ?lang=ar). It is
+// only a default: a language the person chose here always wins.
+const asked = new URLSearchParams(location.search).get('lang');
+const linkLang: Lang | null = asked === 'ar' || asked === 'en' ? asked : null;
+
 const state: State = {
   company: null,
   companyId: null,
   route: { screen: 'home' },
-  lang: (pref('daftar.lang', navigator.language.startsWith('ar') ? 'ar' : 'en') as Lang),
+  lang: (pref('daftar.lang', linkLang ?? (navigator.language.startsWith('ar') ? 'ar' : 'en')) as Lang),
   theme: (pref('daftar.theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') as Theme),
   saving: false,
   saveError: null,
@@ -180,7 +185,7 @@ export async function openCompany(c: Company, id = `c-${Date.now().toString(36)}
   state.elsewhere = false;
   state.companyId = id;
   state.route = { screen: 'home' };
-  if (!pref('daftar.lang', '')) {
+  if (!pref('daftar.lang', '') && !linkLang) {
     state.lang = c.language;
     setLang(c.language);
   }
