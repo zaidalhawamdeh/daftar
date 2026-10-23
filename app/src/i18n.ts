@@ -14,6 +14,8 @@ const AR: Record<string, string> = {
   'Lists': 'القوائم',
   'Search commands…': 'ابحث عن أمر…',
   'Commands': 'الأوامر',
+  'Menu': 'القائمة',
+  'Close menu': 'إغلاق القائمة',
   'Language': 'اللغة',
   'Theme': 'المظهر',
   'Light': 'فاتح',

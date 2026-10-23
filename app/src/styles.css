@@ -163,10 +163,38 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border)
 .report h1 { margin-bottom: 2px; }
 .report .sub { color: var(--muted); margin-bottom: var(--s4); }
 
+/* ---------- phone: a top bar with a menu button; the menu opens as a side panel */
+.mobilebar, .backdrop, .close-menu, .nav-tools { display: none; }
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }
-  .nav { position: static; height: auto; }
+  .mobilebar {
+    display: flex; align-items: center; gap: var(--s3); position: sticky; top: 0; z-index: 5;
+    padding: var(--s2) var(--s4); background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+  .mobilebar .brand { padding: 0; font-size: 16px; line-height: 1.2; }
+  .menu-button { font-weight: 600; }
+  .nav { display: none; }
+  .nav.open {
+    display: block; position: fixed; inset-block: 0; inset-inline-start: 0; z-index: 20;
+    width: min(300px, 86vw); height: 100dvh; box-shadow: 0 0 40px rgb(0 0 0 / 25%);
+  }
+  .nav.open .close-menu { display: block; margin: 0 var(--s2) var(--s3) auto; }
+  .backdrop { display: block; position: fixed; inset: 0; z-index: 19; background: rgb(0 0 0 / 35%); }
+  .nav button.link { padding: 10px var(--s2); }
   .main { padding: var(--s4); }
+  .topbar { flex-wrap: wrap; }
+  .topbar .tools { flex-wrap: wrap; }
+  /* Language, theme and close live in the menu on a phone; the keyboard palette is for desktops. */
+  .topbar .tools { display: none; }
+  .nav.open .nav-tools { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); padding: var(--s4) var(--s2) 0; border-top: 1px solid var(--border); }
+  /* Tables you type into keep usable columns and scroll sideways instead of squeezing. */
+  .table-wrap:has(input, select) > table { min-width: 680px; }
+  /* Room for a finger, and 16px fields so phones do not zoom in on focus. */
+  button, .btn { min-height: 42px; }
+  button.small { min-height: 36px; }
+  input, select, textarea { font-size: 16px; min-height: 42px; }
+  td input, td select { min-height: 40px; }
+  .stat .value { font-size: 20px; }
 }
 @media print {
   .nav, .topbar .tools, .no-print { display: none !important; }

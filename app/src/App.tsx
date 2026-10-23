@@ -23,13 +23,18 @@ import { Import } from './screens/Import.tsx';
 export function App() {
   const s = useApp();
   const [palette, setPalette] = useState(false);
+  // On a phone the menu is a panel behind a button; picking a screen closes it.
+  const [menu, setMenu] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPalette((p) => !p);
       }
-      if (e.key === 'Escape') setPalette(false);
+      if (e.key === 'Escape') {
+        setPalette(false);
+        setMenu(false);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -39,6 +44,11 @@ export function App() {
   const c = s.company;
   const r = s.route;
   const p = r.params ?? {};
+  const open = (screen: ScreenId, params?: Record<string, unknown>) => {
+    go(screen, params);
+    setMenu(false);
+    window.scrollTo(0, 0);
+  };
   const current = (screen: ScreenId, params?: Record<string, unknown>) => r.screen === screen && (!params || Object.entries(params).every(([k, v]) => p[k] === v));
 
   const screen = (() => {
@@ -65,7 +75,18 @@ export function App() {
 
   return (
     <div class="shell">
-      <nav class="nav" aria-label={t('Commands')}>
+      <header class="mobilebar">
+        <button class="menu-button" aria-expanded={menu} aria-controls="nav" onClick={() => setMenu((m) => !m)}>
+          <span aria-hidden="true">☰</span> {t('Menu')}
+        </button>
+        <div class="brand">
+          {lang() === 'ar' ? 'دفتر' : 'Daftar'}
+          <small>{c.name}</small>
+        </div>
+      </header>
+      {menu && <div class="backdrop" onClick={() => setMenu(false)} aria-hidden="true" />}
+      <nav id="nav" class={menu ? 'nav open' : 'nav'} aria-label={t('Commands')}>
+        <button class="small close-menu" onClick={() => setMenu(false)}>{t('Close menu')}</button>
         <div class="brand">
           {lang() === 'ar' ? 'دفتر' : 'Daftar'}
           <small>{c.name}</small>
@@ -74,12 +95,21 @@ export function App() {
           <div key={g.group}>
             {g.group && <h4>{t(g.group)}</h4>}
             {g.items.map((i) => (
-              <button key={i.label} class="link" aria-current={current(i.target.screen, i.target.params) ? 'page' : undefined} onClick={() => go(i.target.screen, i.target.params)}>
+              <button key={i.label} class="link" aria-current={current(i.target.screen, i.target.params) ? 'page' : undefined} onClick={() => open(i.target.screen, i.target.params)}>
                 {t(i.label)}
               </button>
             ))}
           </div>
         ))}
+        <div class="nav-tools">
+          <button class="small" lang={s.lang === 'ar' ? 'en' : 'ar'} onClick={() => setLanguage(s.lang === 'ar' ? 'en' : 'ar')}>
+            {s.lang === 'ar' ? 'English' : 'العربية'}
+          </button>
+          <button class="small" onClick={() => setTheme(s.theme === 'dark' ? 'light' : 'dark')}>
+            {s.theme === 'dark' ? t('Light') : t('Dark')}
+          </button>
+          <button class="small" onClick={closeCompany}>{t('Close company')}</button>
+        </div>
       </nav>
       <main class="main">
         <div class="topbar">
