@@ -5,7 +5,7 @@ workflows people know from QuickBooks Desktop (invoices, bills, payments, bank r
 standard reports) and runs in the browser or installs as an app, with no account, no server and no
 internet needed.
 
-*Daftar (دفتر) is Arabic for "ledger". It is a working name.*
+*Daftar (دفتر) is Arabic for "ledger".*
 
 ![Home](docs/images/home.png)
 
@@ -164,4 +164,4 @@ with, sponsored by or endorsed by Intuit; the name is used only to describe comp
 
 ## License
 
-To be chosen before the first public release.
+[Apache License 2.0](LICENSE). Copyright © 2026 Zaid Alhawamdeh Technology; see [`NOTICE`](NOTICE).

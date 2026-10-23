@@ -1,6 +1,6 @@
 # Daftar — instructions for agents
 
-Daftar (working name) is a clean-room, open-source, offline-first accounting app for small businesses,
+Daftar is a clean-room, open-source, offline-first accounting app for small businesses,
 targeting QuickBooks Desktop parity in workflow, plus what QuickBooks never did well: Arabic and
 right-to-left, 3-decimal currencies, and a file that stays yours. The plan, in Arabic for the owner, is
 [`PLAN.md`](PLAN.md). Read it first.

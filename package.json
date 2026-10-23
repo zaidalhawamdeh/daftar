@@ -6,7 +6,7 @@
   "description": "Open-source, offline accounting for small businesses (QuickBooks Desktop-style workflows).",
   "author": "Zaid Alhawamdeh Technology",
   "main": "desktop/main.cjs",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=24"
   },
