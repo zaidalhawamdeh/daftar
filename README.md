@@ -74,7 +74,7 @@ feature. The rules are written down in [`CLAUDE.md`](CLAUDE.md) and checked by t
 - **Integrity check:** `core/integrity.ts` verifies every assumption the core makes; a company file
   must pass it to open, and every random test asserts it.
 
-129 tests run in about three seconds: `npm test`.
+129 tests run in about five seconds: `npm test`.
 
 ## Try it
 
