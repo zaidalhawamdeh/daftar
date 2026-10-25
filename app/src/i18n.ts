@@ -202,6 +202,22 @@ const AR: Record<string, string> = {
   'Enter now': 'إدخال الآن',
   'Pause': 'إيقاف مؤقت',
   'Resume': 'استئناف',
+  // VAT
+  'VAT': 'الضريبة',
+  'VAT (UAE)': 'ضريبة القيمة المضافة (الإمارات)',
+  'Prices include VAT': 'الأسعار شاملة الضريبة',
+  'Subtotal before VAT': 'المجموع قبل الضريبة',
+  'Reverse-charge VAT (not paid to the vendor)': 'ضريبة الاحتساب العكسي (لا تُدفع للمورّد)',
+  'For invoice': 'عن الفاتورة',
+  'For bill': 'عن فاتورة الشراء',
+  'Tax Registration Number (TRN)': 'رقم التسجيل الضريبي (TRN)',
+  'UAE VAT is available for companies kept in UAE dirhams (AED).': 'ضريبة القيمة المضافة الإماراتية متاحة للشركات التي تمسك دفاترها بالدرهم الإماراتي.',
+  'Registered for VAT. New lines are standard-rated (5%) unless you choose another tax code.': 'الشركة مسجّلة في الضريبة. الأسطر الجديدة خاضعة للنسبة الأساسية (٥٪) ما لم تختر رمزاً آخر.',
+  'Register the company to add VAT to documents, print tax invoices and prepare the VAT return.': 'سجّل الشركة لإضافة الضريبة إلى المستندات وطباعة الفواتير الضريبية وإعداد الإقرار الضريبي.',
+  'Emirate of establishment': 'إمارة المقر',
+  'Address on tax invoices': 'العنوان على الفواتير الضريبية',
+  'Save VAT details': 'حفظ بيانات الضريبة',
+  'Register for VAT': 'التسجيل في الضريبة',
 };
 
 let current: Lang = 'en';
@@ -222,6 +238,20 @@ export function t(key: string): string {
 
 // Problems from the core carry English messages; the most common ones read in Arabic too.
 const PROBLEMS_AR: Record<string, string> = {
+  'vat.currency': 'ضريبة القيمة المضافة الإماراتية تحتاج شركة دفاترها بالدرهم الإماراتي.',
+  'vat.trn_invalid': 'رقم التسجيل الضريبي ١٥ رقماً.',
+  'trn.invalid': 'رقم التسجيل الضريبي ١٥ رقماً.',
+  'vat.emirate_invalid': 'اختر الإمارة التي فيها مقرّ المنشأة.',
+  'vat.address_missing': 'عنوان المنشأة مطلوب على الفواتير الضريبية.',
+  'vat.account_name_taken': 'يوجد حساب بنفس اسم حساب الضريبة؛ غيّر اسمه أولاً.',
+  'vat.not_registered': 'سجّل الشركة في ضريبة القيمة المضافة أولاً.',
+  'line.vat_off': 'الشركة غير مسجّلة في ضريبة القيمة المضافة.',
+  'line.tax_code_invalid': 'رمز الضريبة غير صحيح.',
+  'line.reverse_charge_sales': 'الاحتساب العكسي للمشتريات فقط.',
+  'line.account_vat': 'الضريبة تُحسب من رمز الضريبة؛ لا يُستخدم حساب الضريبة في سطر.',
+  'item.tax_code_invalid': 'رمز الضريبة للصنف: أساسي أو صفر أو معفى أو خارج النطاق.',
+  'doc.ref_invalid': 'اختر مستنداً لنفس الاسم.',
+  'date.order': 'بداية الفترة بعد نهايتها.',
   'entry.unbalanced': 'المدين لا يساوي الدائن.',
   'date.invalid': 'التاريخ غير صحيح.',
   'date.closed': 'الدفاتر مقفلة في هذا التاريخ.',

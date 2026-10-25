@@ -2,6 +2,8 @@ import { useState } from 'preact/hooks';
 import type { Company } from '../../../core/company.ts';
 import type { Item, ItemType } from '../../../core/items.ts';
 import { formatAmount } from '../../../core/money.ts';
+import { ITEM_TAX_CODES, type TaxCode } from '../../../core/vat.ts';
+import { taxCodeName } from '../labels.ts';
 import { t } from '../i18n.ts';
 import { run } from '../state.ts';
 import { AccountSelect, AmountInput, Empty, Field, Money, ProblemBox, badAmount, parseMoney, useOutcome } from '../ui.tsx';
@@ -58,11 +60,12 @@ function ItemForm({ c, item, onDone }: { c: Company; item: Item | null; onDone: 
   const [cost, setCost] = useState(item && item.cost ? formatAmount(item.cost, c.currency, { grouping: false }) : '');
   const [salesAccountId, setSales] = useState(item?.salesAccountId ?? '');
   const [purchaseAccountId, setPurchase] = useState(item?.purchaseAccountId ?? '');
+  const [taxCode, setTaxCode] = useState<TaxCode | ''>(item?.taxCode ?? '');
   const save = (e: Event) => {
     e.preventDefault();
     const bad = badAmount(c, price, cost);
     if (bad) return out.fail(bad);
-    const params = { type, name, description, price: parseMoney(c, price) ?? 0, cost: parseMoney(c, cost) ?? 0, salesAccountId: salesAccountId || null, purchaseAccountId: purchaseAccountId || null };
+    const params = { type, name, description, price: parseMoney(c, price) ?? 0, cost: parseMoney(c, cost) ?? 0, salesAccountId: salesAccountId || null, purchaseAccountId: purchaseAccountId || null, ...(c.vat ? { taxCode: taxCode || null } : {}) };
     const r = item ? run('item.update', { id: item.id, ...params, type: undefined }) : run('item.create', params);
     if (!r.ok) return out.fail(r.error);
     onDone();
@@ -80,7 +83,15 @@ function ItemForm({ c, item, onDone }: { c: Company; item: Item | null; onDone: 
         <Field label={t('Sales price')}><AmountInput c={c} value={price} onInput={setPrice} /></Field>
         <Field label={t('Sales account')}><AccountSelect c={c} value={salesAccountId} onChange={setSales} types={['income', 'other_income']} allowNone /></Field>
         <Field label={t('Cost')}><AmountInput c={c} value={cost} onInput={setCost} /></Field>
-        <Field label={t('Purchase account')}><AccountSelect c={c} value={purchaseAccountId} onChange={setPurchase} exclude={['accounts_receivable', 'accounts_payable']} allowNone /></Field>
+        <Field label={t('Purchase account')}><AccountSelect c={c} value={purchaseAccountId} onChange={setPurchase} exclude={['accounts_receivable', 'accounts_payable']} allowNone noVat /></Field>
+        {c.vat && (
+          <Field label={t('VAT')}>
+            <select value={taxCode} onChange={(e) => setTaxCode((e.target as HTMLSelectElement).value as TaxCode | '')}>
+              <option value="">{taxCodeName('SR')}</option>
+              {ITEM_TAX_CODES.filter((k) => k !== 'SR').map((k) => <option key={k} value={k}>{taxCodeName(k)}</option>)}
+            </select>
+          </Field>
+        )}
       </div>
       <ProblemBox p={out.problem} />
       <div class="row">

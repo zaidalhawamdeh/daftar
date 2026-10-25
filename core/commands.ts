@@ -23,6 +23,7 @@ import { balanceSheet, generalLedger, profitAndLoss, trialBalance } from './repo
 import { aging, openInvoices, partyBalances, unpaidBills } from './subledger.ts';
 import { exportIif, importIif } from './import/iif.ts';
 import { importList, importOpeningBalances } from './import/opening.ts';
+import { setupVat, vatReturn } from './vat.ts';
 
 export interface CommandSpec {
   id: string;
@@ -178,6 +179,8 @@ commands.push(
   { id: 'report.reconciliation', label: { en: 'Reconciliation Report', ar: 'تقرير المطابقة' }, mutates: false, run: (c, p) => reconciliationReport(c, p.id) },
   { id: 'report.arAging', label: { en: 'A/R Aging', ar: 'أعمار الذمم المدينة' }, mutates: false, run: (c, p) => aging(c, 'customer', p.asOf, p.interval ?? 30, p.periods ?? 3) },
   { id: 'report.apAging', label: { en: 'A/P Aging', ar: 'أعمار الذمم الدائنة' }, mutates: false, run: (c, p) => aging(c, 'vendor', p.asOf, p.interval ?? 30, p.periods ?? 3) },
+  { id: 'vat.setup', label: { en: 'VAT Registration', ar: 'التسجيل في ضريبة القيمة المضافة' }, mutates: true, run: (c, p) => setupVat(c, p) },
+  { id: 'report.vatReturn', label: { en: 'VAT Return (VAT 201)', ar: 'الإقرار الضريبي (VAT 201)' }, mutates: false, run: (c, p) => vatReturn(c, p) },
   { id: 'report.cashFlow', label: { en: 'Statement of Cash Flows', ar: 'قائمة التدفقات النقدية' }, mutates: false, run: (c, p) => cashFlow(c, p.from, p.to) },
   { id: 'memorized.create', label: { en: 'Memorize Transaction', ar: 'حفظ معاملة متكررة' }, mutates: true, run: (c, p) => createMemorized(c, runner(c), p) },
   { id: 'memorized.list', label: { en: 'Memorized Transactions', ar: 'المعاملات المحفوظة' }, mutates: false, run: (c): Result<Memorized[]> => ok([...c.memorized.values()]) },

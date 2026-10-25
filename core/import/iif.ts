@@ -315,7 +315,7 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
         if (!l.party || l.party.kind !== (ar ? 'customer' : 'vendor')) {
           return err('iif.name_missing', `Line ${head.line}: a line on "${c.accounts.get(l.accountId)?.name}" needs a ${ar ? 'customer' : 'vendor'} name.`);
         }
-        const body = { date, memo: memo || l.memo, accountId: l.accountId, lines: [{ accountId: cl.value, amount: Math.abs(l.amount), description: l.memo || memo }] };
+        const body = { date, memo: memo || l.memo, accountId: l.accountId, lines: [{ accountId: cl.value, amount: Math.abs(l.amount), description: l.memo || memo, taxCode: c.vat ? 'OS' : undefined }] };
         const made = ar ? createSalesDoc(c, kind as 'invoice' | 'credit_memo', { ...body, customerId: l.party.id }) : createPurchaseDoc(c, kind as 'bill' | 'vendor_credit', { ...body, vendorId: l.party.id });
         if (!made.ok) return fail(head.line, made.error);
         count(kind);
@@ -350,7 +350,7 @@ type Count = (kind: string) => void;
 function mapped(c: Company, type: string, lines: Line[], h: { date: string; number: string; memo: string; due: string | null }, count: Count, renumbered: () => void): Result<boolean> {
   const [head, ...rest] = lines as [Line, ...Line[]];
   const plain = rest.every((l) => !isControl(l.type));
-  const docLines = (sign: 1 | -1) => rest.map((l) => ({ accountId: l.accountId, amount: sign * l.amount, description: l.memo }));
+  const docLines = (sign: 1 | -1) => rest.map((l) => ({ accountId: l.accountId, amount: sign * l.amount, description: l.memo, taxCode: c.vat ? 'OS' : undefined }));
   const restSign = (sign: 1 | -1) => rest.every((l) => sign * l.amount > 0);
   // A number already in use (QuickBooks allows repeats) gets the next free one; the count is reported.
   const withNumber = <T>(make: (n: string | undefined) => Result<T>): Result<T> => {

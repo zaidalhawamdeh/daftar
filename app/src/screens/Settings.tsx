@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Company } from '../../../core/company.ts';
 import { fromText, toText } from '../../../store/serialize.ts';
+import { EMIRATES, type Emirate } from '../../../core/vat.ts';
 import { lang, t } from '../i18n.ts';
+import { emirateName } from '../labels.ts';
 import { listBackups, openCompany, restoreBackup, run, useApp } from '../state.ts';
 import { DateInput, Field, ProblemBox, useOutcome } from '../ui.tsx';
 
@@ -65,6 +67,8 @@ export function Settings({ c }: { c: Company }) {
         </div>
       </div>
 
+      <VatSettings c={c} />
+
       <h2>{t('Closing date')}</h2>
       <div class="card">
         <p class="muted">{t('Books are closed through')}: <strong class="num">{c.closingDate ?? t('Not set')}</strong></p>
@@ -103,5 +107,46 @@ export function Settings({ c }: { c: Company }) {
         </table>
       </div>
     </div>
+  );
+}
+
+// UAE VAT registration: the TRN, the emirate of establishment (which return box the sales go in) and
+// the address printed on tax invoices. Only for companies kept in dirhams.
+function VatSettings({ c }: { c: Company }) {
+  const out = useOutcome();
+  const [trn, setTrn] = useState(c.vat?.trn ?? '');
+  const [emirate, setEmirate] = useState<Emirate | ''>(c.vat?.emirate ?? '');
+  const [address, setAddress] = useState(c.vat?.address ?? '');
+  const save = () => {
+    const r = run('vat.setup', { trn, emirate, address });
+    if (!r.ok) return out.fail(r.error);
+    out.succeed('✓');
+  };
+  return (
+    <>
+      <h2>{t('VAT (UAE)')}</h2>
+      <div class="card">
+        {c.currency.code !== 'AED' ? (
+          <p class="muted">{t('UAE VAT is available for companies kept in UAE dirhams (AED).')}</p>
+        ) : (
+          <>
+            <p class="muted">{c.vat ? t('Registered for VAT. New lines are standard-rated (5%) unless you choose another tax code.') : t('Register the company to add VAT to documents, print tax invoices and prepare the VAT return.')}</p>
+            <div class="fields">
+              <Field label={t('Tax Registration Number (TRN)')}><input value={trn} inputMode="numeric" placeholder="100…" onInput={(e) => setTrn((e.target as HTMLInputElement).value)} /></Field>
+              <Field label={t('Emirate of establishment')}>
+                <select value={emirate} onChange={(e) => setEmirate((e.target as HTMLSelectElement).value as Emirate)}>
+                  <option value="">{t('Choose…')}</option>
+                  {EMIRATES.map((e) => <option key={e} value={e}>{emirateName(e)}</option>)}
+                </select>
+              </Field>
+              <Field label={t('Address on tax invoices')} wide><input value={address} onInput={(e) => setAddress((e.target as HTMLInputElement).value)} /></Field>
+            </div>
+            <button class="primary" onClick={save}>{c.vat ? t('Save VAT details') : t('Register for VAT')}</button>
+          </>
+        )}
+        <ProblemBox p={out.problem} />
+        {out.notice && <div class="notice" role="status">{out.notice}</div>}
+      </div>
+    </>
   );
 }

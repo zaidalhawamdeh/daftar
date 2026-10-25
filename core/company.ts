@@ -11,6 +11,7 @@ import type { Application, Doc } from './documents.ts';
 import type { Memorized } from './memorized.ts';
 import type { Item } from './items.ts';
 import type { Party } from './parties.ts';
+import type { VatSettings } from './vat.ts';
 
 export interface Line {
   accountId: string;
@@ -44,6 +45,7 @@ export interface Company {
   fiscalYearStartMonth: number;
   closingDate: string | null;
   closingDateLog: { from: string | null; to: string | null }[];
+  vat: VatSettings | null; // registered for UAE VAT
   accounts: Map<string, Account>;
   entries: Entry[];
   parties: Map<string, Party>;
@@ -106,6 +108,7 @@ export function createCompany(input: CreateCompanyInput): Result<Company> {
     fiscalYearStartMonth: fy,
     closingDate: null,
     closingDateLog: [],
+    vat: null,
     accounts: new Map(),
     entries: [],
     parties: new Map(),

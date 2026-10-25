@@ -12,9 +12,11 @@ import { checkIntegrity } from '../core/integrity.ts';
 import { currency } from '../core/money.ts';
 import type { Party } from '../core/parties.ts';
 import { err, ok, type Result } from '../core/result.ts';
+import type { VatSettings } from '../core/vat.ts';
 
 export const FORMAT = 'daftar-company';
-export const VERSION = 1;
+// Version 2 added UAE VAT (company settings, tax codes on lines). Version 1 files still open.
+export const VERSION = 2;
 
 export interface CompanyFile {
   format: typeof FORMAT;
@@ -27,6 +29,7 @@ export interface CompanyFile {
     fiscalYearStartMonth: number;
     closingDate: string | null;
     closingDateLog: { from: string | null; to: string | null }[];
+    vat: VatSettings | null;
     accounts: Account[];
     entries: Entry[];
     parties: Party[];
@@ -55,6 +58,7 @@ export function toFile(c: Company, savedAt = new Date().toISOString()): CompanyF
       fiscalYearStartMonth: copy.fiscalYearStartMonth,
       closingDate: copy.closingDate,
       closingDateLog: copy.closingDateLog,
+      vat: copy.vat,
       accounts: [...copy.accounts.values()],
       entries: copy.entries,
       parties: [...copy.parties.values()],
@@ -99,9 +103,10 @@ export function fromFile(data: unknown): Result<Company> {
 // both pass, so a file can never leave the core holding a state it could not have produced itself.
 function build(data: unknown): Result<Company> {
   if (!isObj(data) || data.format !== FORMAT) return bad('format');
-  if (data.version !== VERSION) return err('file.version', `This file was saved by a newer version of Daftar (format ${String(data.version)}).`);
+  if (data.version !== 1 && data.version !== VERSION) return err('file.version', `This file was saved by a newer version of Daftar (format ${String(data.version)}).`);
   const f = data.company;
   if (!isObj(f)) return bad('company');
+  if (data.version === 1) upgradeFrom1(f);
   const cur = currency(f.currency);
   if (!cur.ok) return bad('currency');
   if (f.language !== 'en' && f.language !== 'ar') return bad('language');
@@ -154,6 +159,7 @@ function build(data: unknown): Result<Company> {
     fiscalYearStartMonth: f.fiscalYearStartMonth as number,
     closingDate: (f.closingDate ?? null) as string | null,
     closingDateLog: f.closingDateLog as Company['closingDateLog'],
+    vat: (f.vat ?? null) as VatSettings | null,
     accounts,
     entries,
     parties,
@@ -175,4 +181,23 @@ function build(data: unknown): Result<Company> {
   const sound = checkIntegrity(company);
   if (!sound.ok) return bad(String(sound.error.details?.what ?? sound.error.message));
   return ok(company);
+}
+
+// Version 1 had no VAT: every tax field starts empty, so the books read exactly as they did.
+function upgradeFrom1(f: Record<string, unknown>): void {
+  f.vat = null;
+  const rows = (k: string) => (Array.isArray(f[k]) ? (f[k] as unknown[]).filter(isObj) : []);
+  for (const p of rows('parties')) if (p.trn === undefined) p.trn = '';
+  for (const i of rows('items')) if (i.taxCode === undefined) i.taxCode = null;
+  for (const d of rows('documents')) {
+    if (d.taxInclusive === undefined) d.taxInclusive = false;
+    if (d.refId === undefined) d.refId = null;
+    if (Array.isArray(d.lines)) {
+      for (const l of d.lines) {
+        if (!isObj(l)) continue;
+        if (l.taxCode === undefined) l.taxCode = null;
+        if (l.tax === undefined) l.tax = 0;
+      }
+    }
+  }
 }

@@ -4,13 +4,14 @@ import type { Company } from '../../../core/company.ts';
 import { fiscalYearStart } from '../../../core/dates.ts';
 import type { BalanceSheet, LedgerAccount, ProfitAndLoss, ReportRow, Section, TrialBalance } from '../../../core/reports.ts';
 import type { Aging, OpenDocs, PartyBalances } from '../../../core/subledger.ts';
+import { EMIRATES, type VatReturn } from '../../../core/vat.ts';
 import { lang, t } from '../i18n.ts';
-import { reportName, typeName } from '../labels.ts';
+import { emirateName, reportName, typeName } from '../labels.ts';
 import { REPORTS } from '../routes.ts';
 import { go, run } from '../state.ts';
 import { DateInput, Field, Money, ProblemBox, today } from '../ui.tsx';
 
-const RANGE = new Set(['profitAndLoss', 'cashFlow', 'generalLedger']);
+const RANGE = new Set(['profitAndLoss', 'cashFlow', 'generalLedger', 'vatReturn']);
 const COMMAND: Record<string, string> = {
   profitAndLoss: 'report.profitAndLoss',
   balanceSheet: 'report.balanceSheet',
@@ -23,6 +24,7 @@ const COMMAND: Record<string, string> = {
   vendorBalances: 'report.vendorBalances',
   openInvoices: 'report.openInvoices',
   unpaidBills: 'report.unpaidBills',
+  vatReturn: 'report.vatReturn',
 };
 
 export function Reports({ c, report }: { c: Company; report: string }) {
@@ -36,7 +38,7 @@ export function Reports({ c, report }: { c: Company; report: string }) {
       <div class="row no-print" style={{ marginBottom: 'var(--s4)' }}>
         <Field label={t('Reports')}>
           <select value={report} onChange={(e) => go('reports', { report: (e.target as HTMLSelectElement).value })}>
-            {REPORTS.map((id) => <option key={id} value={id}>{reportName(id)}</option>)}
+            {REPORTS.filter((id) => id !== 'vatReturn' || c.vat).map((id) => <option key={id} value={id}>{reportName(id)}</option>)}
           </select>
         </Field>
         {ranged && <Field label={t('From')}><DateInput value={from} onInput={setFrom} /></Field>}
@@ -62,6 +64,7 @@ function Body({ c, report, data }: { c: Company; report: string; data: unknown }
     case 'apAging': return <AgingTable c={c} r={data as Aging} />;
     case 'customerBalances':
     case 'vendorBalances': return <Balances c={c} r={data as PartyBalances} />;
+    case 'vatReturn': return <VatReturnTable c={c} r={data as VatReturn} />;
     default: return <OpenTable c={c} r={data as OpenDocs} />;
   }
 }
@@ -224,5 +227,47 @@ function OpenTable({ c, r }: { c: Company; r: OpenDocs }) {
       <tbody>{r.rows.map((x) => <tr key={x.docId}><td>{x.name}</td><td>{x.number}</td><td class="num">{x.date}</td><td class="num">{x.dueDate}</td><td class="n"><Money c={c} value={x.total} /></td><td class="n"><Money c={c} value={x.open} /></td></tr>)}</tbody>
       <tfoot><tr><td colSpan={5}>{t('Total')}</td><td class="n"><Money c={c} value={r.total} /></td></tr></tfoot>
     </table></div>
+  );
+}
+
+// The boxes of the FTA's VAT 201 return, in its order. Boxes the books cannot know (tourist refunds,
+// imports through customs) are shown empty and say so.
+function VatReturnTable({ c, r }: { c: Company; r: VatReturn }) {
+  const row = (box: string, label: string, amount: number | null, vat: number | null, strong = false) => (
+    <tr class={strong ? 'sub' : ''} key={box}>
+      <td class="num">{box}</td>
+      <td>{label}</td>
+      <td class="n">{amount === null ? '' : <Money c={c} value={amount} />}</td>
+      <td class="n">{vat === null ? '' : <Money c={c} value={vat} />}</td>
+    </tr>
+  );
+  const letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+  return (
+    <>
+      <p class="muted">{L(`Tax Registration Number ${c.vat?.trn ?? ''} · standard-rated supplies are reported under ${emirateName(r.emirate)}, where the business is established.`, `رقم التسجيل الضريبي ${c.vat?.trn ?? ''} · تُدرَج التوريدات الخاضعة للنسبة الأساسية في ${emirateName(r.emirate)}، حيث مقرّ المنشأة.`)}</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>{L('Box', 'الخانة')}</th><th>{L('Description', 'البيان')}</th><th class="n">{L('Amount (AED)', 'المبلغ (درهم)')}</th><th class="n">{L('VAT (AED)', 'الضريبة (درهم)')}</th></tr></thead>
+        <tbody>
+          <tr><td colSpan={4}><strong>{L('VAT on sales and all other outputs', 'ضريبة القيمة المضافة على المبيعات وجميع المخرجات الأخرى')}</strong></td></tr>
+          {EMIRATES.map((e, i) => row(`1${letters[i]}`, L(`Standard rated supplies in ${emirateName(e)}`, `التوريدات الخاضعة للنسبة الأساسية في ${emirateName(e)}`), r.box1[e].amount, r.box1[e].vat))}
+          {row('2', L('Tax refunds provided to tourists (not kept in these books)', 'المبالغ المستردة للسياح (لا تُسجَّل في هذه الدفاتر)'), null, null)}
+          {row('3', L('Supplies subject to the reverse charge provisions', 'التوريدات الخاضعة لآلية الاحتساب العكسي'), r.box3.amount, r.box3.vat)}
+          {row('4', L('Zero rated supplies', 'التوريدات الخاضعة للنسبة الصفرية'), r.box4, null)}
+          {row('5', L('Exempt supplies', 'التوريدات المعفاة'), r.box5, null)}
+          {row('6', L('Goods imported into the UAE (pre-filled by the FTA from customs)', 'السلع المستوردة إلى الدولة (تعبّئها الهيئة من بيانات الجمارك)'), null, null)}
+          {row('7', L('Adjustments to goods imported into the UAE', 'التعديلات على السلع المستوردة إلى الدولة'), null, null)}
+          {row('8', L('Totals', 'المجاميع'), r.box8.amount, r.box8.vat, true)}
+          <tr><td colSpan={4}><strong>{L('VAT on expenses and all other inputs', 'ضريبة القيمة المضافة على المصروفات وجميع المدخلات الأخرى')}</strong></td></tr>
+          {row('9', L('Standard rated expenses', 'النفقات الخاضعة للنسبة الأساسية'), r.box9.amount, r.box9.vat)}
+          {row('10', L('Supplies subject to the reverse charge provisions', 'التوريدات الخاضعة لأحكام آلية الاحتساب العكسي'), r.box10.amount, r.box10.vat)}
+          {row('11', L('Totals', 'المجاميع'), r.box11.amount, r.box11.vat, true)}
+          <tr><td colSpan={4}><strong>{L('Net VAT due', 'صافي الضريبة المستحقة')}</strong></td></tr>
+          {row('12', L('Total value of due tax for the period', 'إجمالي قيمة الضريبة المستحقة عن الفترة'), null, r.box12)}
+          {row('13', L('Total value of recoverable tax for the period', 'إجمالي قيمة الضريبة القابلة للاسترداد عن الفترة'), null, r.box13)}
+          {row('14', r.box14 >= 0 ? L('Payable tax for the period', 'الضريبة المستحقة الدفع عن الفترة') : L('Recoverable tax for the period (refund or carry forward)', 'الضريبة القابلة للاسترداد عن الفترة (استرداد أو ترحيل)'), null, r.box14, true)}
+        </tbody>
+      </table></div>
+      <p class="muted" style={{ marginTop: 'var(--s3)' }}>{L(`${r.documents.length} documents counted, by document date. Check the figures before filing; not modelled: imports through customs, partial or blocked input tax, the profit margin scheme and designated zones.`, `احتُسبت ${r.documents.length} مستندات حسب تاريخها. راجع الأرقام قبل التقديم؛ لا يشمل التقرير: الاستيراد عبر الجمارك، والاسترداد الجزئي أو المحظور لضريبة المدخلات، ونظام هامش الربح، والمناطق المحددة.`)}</p>
+    </>
   );
 }

@@ -163,6 +163,20 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border)
 .report h1 { margin-bottom: 2px; }
 .report .sub { color: var(--muted); margin-bottom: var(--s4); }
 
+/* ---------- a document to print */
+.sheet { background: #fff; color: #111; border: 1px solid var(--border); border-radius: 8px; padding: var(--s6); max-width: 900px; }
+.sheet-head { display: flex; justify-content: space-between; gap: var(--s5); align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: var(--s4); margin-bottom: var(--s4); }
+.sheet-title { font-size: 24px; font-weight: 750; }
+.sheet-from { text-align: end; }
+.sheet-meta { display: flex; justify-content: space-between; gap: var(--s5); margin-bottom: var(--s4); flex-wrap: wrap; }
+.sheet-facts td { border: 0; padding: 2px 8px; }
+.sheet-note { background: #f5f5f5; border-radius: 6px; padding: var(--s3); margin-bottom: var(--s4); }
+.sheet-lines th { background: #f0f0f0; color: #333; }
+.sheet-lines td, .sheet-lines th { border-bottom: 1px solid #ddd; }
+.sheet-totals { width: auto; margin-inline-start: auto; margin-top: var(--s3); min-width: 280px; }
+.sheet-totals td { border: 0; padding: 4px 10px; }
+.sheet-totals tr.sub td { border-top: 2px solid #111; font-weight: 700; background: none; }
+
 /* ---------- phone: a top bar with a menu button; the menu opens as a side panel */
 .mobilebar, .backdrop, .close-menu, .nav-tools { display: none; }
 @media (max-width: 860px) {
@@ -197,7 +211,8 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border)
   .stat .value { font-size: 20px; }
 }
 @media print {
-  .nav, .topbar .tools, .no-print { display: none !important; }
+  .nav, .topbar, .mobilebar, .no-print { display: none !important; }
+  .sheet { border: 0; padding: 0; max-width: none; }
   .shell { display: block; }
   .main { padding: 0; }
 }

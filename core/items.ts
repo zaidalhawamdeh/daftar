@@ -5,6 +5,7 @@ import { classOf } from './accounts.ts';
 import { cleanName, isObject, type Company } from './company.ts';
 import { isMinor, type Minor } from './money.ts';
 import { err, ok, type Result } from './result.ts';
+import { ITEM_TAX_CODES, type TaxCode } from './vat.ts';
 
 export type ItemType = 'service' | 'non_inventory' | 'other_charge';
 const ITEM_TYPES: readonly ItemType[] = ['service', 'non_inventory', 'other_charge'];
@@ -18,6 +19,7 @@ export interface Item {
   cost: Minor; // default purchase rate
   salesAccountId: string | null;
   purchaseAccountId: string | null;
+  taxCode: TaxCode | null; // default VAT code on lines; null means standard rate
   active: boolean;
 }
 
@@ -29,6 +31,7 @@ export interface ItemInput {
   cost?: unknown;
   salesAccountId?: unknown;
   purchaseAccountId?: unknown;
+  taxCode?: unknown;
 }
 
 const NOT_POSTABLE = new Set(['accounts_receivable', 'accounts_payable']);
@@ -47,6 +50,12 @@ function account(c: Company, v: unknown, side: 'sales' | 'purchase'): Result<str
   if (NOT_POSTABLE.has(a.type)) return err('item.account_type', `An item cannot post to "${a.name}".`);
   if (side === 'sales' && classOf(a.type) !== 'income') return err('item.account_class', `Sales should post to an income account, not "${a.name}".`);
   return ok(a.id);
+}
+
+function taxCodeOf(v: unknown): Result<TaxCode | null> {
+  if (v === undefined || v === null || v === '') return ok(null);
+  if (typeof v !== 'string' || !(ITEM_TAX_CODES as readonly string[]).includes(v)) return err('item.tax_code_invalid', 'Tax code is SR, ZR, EX or OS.');
+  return ok(v as TaxCode);
 }
 
 function uniqueName(c: Company, name: string, selfId: string | null): Result<string> {
@@ -80,6 +89,8 @@ export function createItem(c: Company, input: ItemInput): Result<Item> {
   const purchase = account(c, input.purchaseAccountId, 'purchase');
   if (!purchase.ok) return purchase;
   if (!sales.value && !purchase.value) return err('item.no_account', 'An item needs a sales account, a purchase account, or both.');
+  const taxCode = taxCodeOf(input.taxCode);
+  if (!taxCode.ok) return taxCode;
   const item: Item = {
     id: `i-${c.nextItemId++}`,
     type: type as ItemType,
@@ -89,6 +100,7 @@ export function createItem(c: Company, input: ItemInput): Result<Item> {
     cost: cost.value,
     salesAccountId: sales.value,
     purchaseAccountId: purchase.value,
+    taxCode: taxCode.value,
     active: true,
   };
   c.items.set(item.id, item);
@@ -115,7 +127,9 @@ export function updateItem(c: Company, id: unknown, input: ItemInput): Result<It
   const purchase = input.purchaseAccountId === undefined ? ok(i.purchaseAccountId) : account(c, input.purchaseAccountId, 'purchase');
   if (!purchase.ok) return purchase;
   if (!sales.value && !purchase.value) return err('item.no_account', 'An item needs a sales account, a purchase account, or both.');
-  Object.assign(i, { name: name.value, description: desc.value, price: price.value, cost: cost.value, salesAccountId: sales.value, purchaseAccountId: purchase.value });
+  const taxCode = input.taxCode === undefined ? ok(i.taxCode) : taxCodeOf(input.taxCode);
+  if (!taxCode.ok) return taxCode;
+  Object.assign(i, { taxCode: taxCode.value, name: name.value, description: desc.value, price: price.value, cost: cost.value, salesAccountId: sales.value, purchaseAccountId: purchase.value });
   return ok(i);
 }
 

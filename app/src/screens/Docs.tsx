@@ -5,6 +5,7 @@ import { t } from '../i18n.ts';
 import { docName, docsName } from '../labels.ts';
 import { go, run } from '../state.ts';
 import { Empty, Money, ProblemBox, today, useOutcome } from '../ui.tsx';
+import { PRINTABLE } from './PrintDoc.tsx';
 
 const NEW_SCREEN: Partial<Record<DocKind, [string, Record<string, unknown>]>> = {
   estimate: ['sales-form', { kind: 'estimate' }],
@@ -68,6 +69,7 @@ export function Docs({ c, kind }: { c: Company; kind: DocKind }) {
                     {showOpen && <td class="n"><Money c={c} value={open} blankZero /></td>}
                     <td>{status}</td>
                     <td class="n">
+                      {PRINTABLE.has(kind) && <button class="small" onClick={() => go('print', { docId: d.id })}>{t('Print')}</button>}{' '}
                       {!d.voided && kind === 'estimate' && d.status === 'open' && <button class="small" onClick={() => act('estimate.toInvoice', { docId: d.id, date: today() })}>{t('Convert to invoice')}</button>}
                       {!d.voided && kind === 'purchase_order' && d.status === 'open' && <button class="small" onClick={() => act('purchaseOrder.toBill', { docId: d.id, date: today() })}>{t('Receive as bill')}</button>}
                       {!d.voided && CREDIT_KINDS.has(kind) && open > 0 && (

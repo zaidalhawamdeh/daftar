@@ -12,6 +12,7 @@ import { formatAmount, isMinor, type Minor } from './money.ts';
 import type { Party, PartyKind } from './parties.ts';
 import { formatQuantity, lineAmount, ONE, parseQuantity, type Milli } from './quantity.ts';
 import { err, ok, type Result } from './result.ts';
+import { isTaxCode, lineTax, vatAccounts, type TaxCode } from './vat.ts';
 
 export type SalesKind = 'estimate' | 'invoice' | 'sales_receipt' | 'credit_memo';
 export type PurchaseKind = 'purchase_order' | 'bill' | 'vendor_credit' | 'expense';
@@ -24,7 +25,9 @@ export interface DocLine {
   description: string;
   quantity: Milli;
   rate: Minor;
-  amount: Minor;
+  amount: Minor; // quantity × rate, as entered (VAT included when the document's prices include it)
+  taxCode: TaxCode | null; // null: the company is not registered for VAT, or the line came in without it
+  tax: Minor; // VAT on the line, rounded to the minor unit
 }
 
 export interface Doc {
@@ -36,7 +39,9 @@ export interface Doc {
   partyId: string | null;
   memo: string;
   lines: DocLine[];
-  total: Minor;
+  total: Minor; // what the customer or vendor owes or paid: values plus the VAT the document charges
+  taxInclusive: boolean; // line prices include VAT
+  refId: number | null; // a credit memo's invoice, or a vendor credit's bill, when it names one
   accountId: string | null; // receivable or payable account the document posts to
   bankAccountId: string | null; // where money came in or went out
   toAccountId: string | null; // transfers only
@@ -159,13 +164,24 @@ interface RawLine {
   quantity?: unknown;
   rate?: unknown;
   amount?: unknown;
+  taxCode?: unknown;
 }
 
-function linesOf(c: Company, side: 'sales' | 'purchase', raw: unknown): Result<{ lines: DocLine[]; total: Minor }> {
+interface Body {
+  lines: DocLine[];
+  total: Minor;
+  vat: Minor; // VAT charged on standard-rated lines
+  reverseCharge: Minor; // VAT the business accounts for itself on reverse-charge lines
+}
+
+function linesOf(c: Company, side: 'sales' | 'purchase', raw: unknown, inclusive: boolean): Result<Body> {
   if (!Array.isArray(raw) || raw.length === 0) return err('doc.lines_missing', 'Add at least one line.');
   if (raw.length > MAX_DOC_LINES) return err('doc.too_many_lines', `A document has at most ${MAX_DOC_LINES} lines.`);
   const lines: DocLine[] = [];
   let total = 0;
+  let vat = 0;
+  let reverseCharge = 0;
+  const vatOn = vatAccounts(c) !== null && c.vat !== null;
   for (const [i, r] of raw.entries()) {
     const where = { line: i + 1 };
     if (!isObject(r)) return err('line.invalid', `Line ${i + 1} is not a line.`, where);
@@ -174,6 +190,7 @@ function linesOf(c: Company, side: 'sales' | 'purchase', raw: unknown): Result<{
     let accountId: string;
     let defaultRate: Minor | undefined;
     let defaultDescription = '';
+    let defaultCode: TaxCode | null = null;
     if (l.itemId !== undefined && l.itemId !== null) {
       const item = typeof l.itemId === 'string' ? c.items.get(l.itemId) : undefined;
       if (!item) return err('line.item_missing', `Line ${i + 1}: item does not exist.`, where);
@@ -184,6 +201,7 @@ function linesOf(c: Company, side: 'sales' | 'purchase', raw: unknown): Result<{
       accountId = acct;
       defaultRate = side === 'sales' ? item.price : item.cost;
       defaultDescription = item.description;
+      defaultCode = item.taxCode;
     } else {
       if (typeof l.accountId !== 'string') return err('line.account_missing', `Line ${i + 1}: choose an item or an account.`, where);
       accountId = l.accountId;
@@ -192,6 +210,7 @@ function linesOf(c: Company, side: 'sales' | 'purchase', raw: unknown): Result<{
     if (!account) return err('line.account_missing', `Line ${i + 1}: account does not exist.`, where);
     if (!account.active) return err('line.account_inactive', `Line ${i + 1}: "${account.name}" is inactive.`, where);
     if (NOT_ON_LINES.has(account.type)) return err('line.account_type', `Line ${i + 1}: "${account.name}" cannot be used on a line.`, where);
+    if (account.role === 'vat_output' || account.role === 'vat_input') return err('line.account_vat', `Line ${i + 1}: VAT is worked out from the tax code; "${account.name}" cannot be used on a line.`, where);
 
     let quantity: Milli = ONE;
     if (l.quantity !== undefined && l.quantity !== null) {
@@ -221,12 +240,59 @@ function linesOf(c: Company, side: 'sales' | 'purchase', raw: unknown): Result<{
       if (typeof l.description !== 'string' || l.description.length > 1000) return err('line.description_invalid', `Line ${i + 1}: description is text up to 1000 characters.`, where);
       description = l.description.trim();
     }
-    total += amount.value;
+    let taxCode: TaxCode | null = null;
+    if (l.taxCode !== undefined && l.taxCode !== null && l.taxCode !== '') {
+      if (!vatOn) return err('line.vat_off', `Line ${i + 1}: the company is not registered for VAT.`, where);
+      if (!isTaxCode(l.taxCode)) return err('line.tax_code_invalid', `Line ${i + 1}: tax code is SR, ZR, EX, OS or RC.`, where);
+      taxCode = l.taxCode;
+    } else if (vatOn) taxCode = defaultCode ?? 'SR';
+    if (taxCode === 'RC' && side === 'sales') return err('line.reverse_charge_sales', `Line ${i + 1}: reverse charge applies to purchases only.`, where);
+    const t = lineTax(amount.value, taxCode, inclusive);
+    total += t.payable;
+    if (taxCode === 'SR') vat += t.tax;
+    if (taxCode === 'RC') reverseCharge += t.tax;
     if (!Number.isSafeInteger(total)) return err('amount.too_large', 'Document total is too large.');
-    lines.push({ itemId, accountId, description, quantity, rate, amount: amount.value });
+    lines.push({ itemId, accountId, description, quantity, rate, amount: amount.value, taxCode, tax: t.tax });
   }
   if (total <= 0) return err('doc.zero_total', 'The document total must be more than zero.');
-  return ok({ lines, total });
+  return ok({ lines, total, vat, reverseCharge });
+}
+
+// The value of a line excluding VAT: what posts to its income or expense account.
+const netOf = (l: DocLine, inclusive: boolean): Minor => (l.taxCode === 'SR' && inclusive ? l.amount - l.tax : l.amount);
+
+function inclusiveOf(v: unknown): Result<boolean> {
+  if (v === undefined || v === null) return ok(false);
+  if (typeof v !== 'boolean') return err('doc.tax_inclusive_invalid', 'Say whether prices include VAT with true or false.');
+  return ok(v);
+}
+
+// A credit memo may name the invoice it corrects, and a vendor credit the bill (a tax credit note must
+// identify the supply it relates to).
+function refOf(c: Company, kind: DocKind, partyId: string | null, v: unknown): Result<number | null> {
+  if (v === undefined || v === null) return ok(null);
+  const target = kind === 'credit_memo' ? 'invoice' : kind === 'vendor_credit' ? 'bill' : null;
+  const d = typeof v === 'number' ? c.documents.get(v) : undefined;
+  if (!target || !d || d.kind !== target || d.partyId !== partyId) return err('doc.ref_invalid', target ? `Choose one of this ${PARTY_KIND[kind]}'s ${target}s.` : 'Only credit memos and vendor credits refer to another document.');
+  return ok(d.id);
+}
+
+// Entry lines for the VAT of a document: output tax on sales and on reverse charge, input tax on
+// purchases and on reverse charge. `sign` is 1 for invoices, receipts, bills and expenses, -1 for
+// credit memos and vendor credits.
+function vatLines(c: Company, side: 'sales' | 'purchase', body: Body, sign: 1 | -1, partyId: string | null): EntryLine[] {
+  const accts = vatAccounts(c);
+  if (!accts || (body.vat === 0 && body.reverseCharge === 0)) return [];
+  const out: EntryLine[] = [];
+  const put = (accountId: string, amount: Minor, debitSide: boolean, memo: string) => {
+    if (amount > 0) out.push(debitSide === (sign === 1) ? dr(accountId, amount, partyId, memo) : cr(accountId, amount, partyId, memo));
+  };
+  if (side === 'sales') put(accts.output, body.vat, false, 'VAT');
+  else {
+    put(accts.input, body.vat + body.reverseCharge, true, 'VAT');
+    put(accts.output, body.reverseCharge, false, 'VAT, reverse charge');
+  }
+  return out;
 }
 
 type EntryLine = { accountId: string; debit: Minor; credit: Minor; memo?: string; partyId: string | null };
@@ -317,12 +383,18 @@ export function createSalesDoc(c: Company, kind: SalesKind, input: unknown): Res
   const partyId = party.value?.id ?? null;
   const memo = memoOf(input.memo);
   if (!memo.ok) return memo;
-  const body = linesOf(c, 'sales', input.lines);
+  const inclusive = inclusiveOf(input.taxInclusive);
+  if (!inclusive.ok) return inclusive;
+  const body = linesOf(c, 'sales', input.lines, inclusive.value);
   if (!body.ok) return body;
   const number = numberOf(c, kind, input.number, partyId);
   if (!number.ok) return number;
+  const ref = refOf(c, kind, partyId, input.refId);
+  if (!ref.ok) return ref;
   const { lines, total } = body.value;
-  const base = { kind, number: number.value, date: date.value, partyId, memo: memo.value, lines, total, toAccountId: null, linkedId: null };
+  const base = { kind, number: number.value, date: date.value, partyId, memo: memo.value, lines, total, taxInclusive: inclusive.value, refId: ref.value, toAccountId: null, linkedId: null };
+  const incomeCr = lines.map((l) => cr(l.accountId, netOf(l, inclusive.value), partyId, l.description));
+  const incomeDr = lines.map((l) => dr(l.accountId, netOf(l, inclusive.value), partyId, l.description));
 
   if (kind === 'estimate') {
     const expires = input.expiresOn === undefined || input.expiresOn === null ? ok(null) : isIsoDate(input.expiresOn) ? ok(input.expiresOn) : err<null>('date.invalid', 'Expiry must be a real date.');
@@ -332,17 +404,17 @@ export function createSalesDoc(c: Company, kind: SalesKind, input: unknown): Res
   if (kind === 'sales_receipt') {
     const into = moneyAccount(c, input.depositToId, RECEIVE_INTO, 'the money received');
     if (!into.ok) return into;
-    return commit(c, { ...base, dueDate: null, accountId: null, bankAccountId: into.value, status: null }, [dr(into.value, total, partyId), ...lines.map((l) => cr(l.accountId, l.amount, partyId, l.description))]);
+    return commit(c, { ...base, dueDate: null, accountId: null, bankAccountId: into.value, status: null }, [dr(into.value, total, partyId), ...incomeCr, ...vatLines(c, 'sales', body.value, 1, partyId)]);
   }
   const ar = controlAccount(c, 'accounts_receivable', input.accountId);
   if (!ar.ok) return ar;
   if (kind === 'invoice') {
     const due = dueDateOf(date.value, party.value, input);
     if (!due.ok) return due;
-    return commit(c, { ...base, dueDate: due.value, accountId: ar.value, bankAccountId: null, status: null }, [dr(ar.value, total, partyId), ...lines.map((l) => cr(l.accountId, l.amount, partyId, l.description))]);
+    return commit(c, { ...base, dueDate: due.value, accountId: ar.value, bankAccountId: null, status: null }, [dr(ar.value, total, partyId), ...incomeCr, ...vatLines(c, 'sales', body.value, 1, partyId)]);
   }
   // credit memo: income goes back down, the customer owes less
-  return commit(c, { ...base, dueDate: null, accountId: ar.value, bankAccountId: null, status: null }, [...lines.map((l) => dr(l.accountId, l.amount, partyId, l.description)), cr(ar.value, total, partyId)]);
+  return commit(c, { ...base, dueDate: null, accountId: ar.value, bankAccountId: null, status: null }, [...incomeDr, ...vatLines(c, 'sales', body.value, -1, partyId), cr(ar.value, total, partyId)]);
 }
 
 // ---------------------------------------------------------------- purchases: purchase order, bill, vendor credit, expense
@@ -356,28 +428,34 @@ export function createPurchaseDoc(c: Company, kind: PurchaseKind, input: unknown
   const partyId = party.value?.id ?? null;
   const memo = memoOf(input.memo);
   if (!memo.ok) return memo;
-  const body = linesOf(c, 'purchase', input.lines);
+  const inclusive = inclusiveOf(input.taxInclusive);
+  if (!inclusive.ok) return inclusive;
+  const body = linesOf(c, 'purchase', input.lines, inclusive.value);
   if (!body.ok) return body;
   const number = numberOf(c, kind, input.number, partyId);
   if (!number.ok) return number;
+  const ref = refOf(c, kind, partyId, input.refId);
+  if (!ref.ok) return ref;
   const { lines, total } = body.value;
-  const base = { kind, number: number.value, date: date.value, partyId, memo: memo.value, lines, total, toAccountId: null, linkedId: null };
+  const base = { kind, number: number.value, date: date.value, partyId, memo: memo.value, lines, total, taxInclusive: inclusive.value, refId: ref.value, toAccountId: null, linkedId: null };
+  const costDr = lines.map((l) => dr(l.accountId, netOf(l, inclusive.value), partyId, l.description));
+  const costCr = lines.map((l) => cr(l.accountId, netOf(l, inclusive.value), partyId, l.description));
 
   if (kind === 'purchase_order') return commit(c, { ...base, dueDate: null, accountId: null, bankAccountId: null, status: 'open' }, null);
   if (kind === 'expense') {
     const from = moneyAccount(c, input.payFromId, PAY_FROM, 'paying');
     if (!from.ok) return from;
-    return commit(c, { ...base, dueDate: null, accountId: null, bankAccountId: from.value, status: null }, [...lines.map((l) => dr(l.accountId, l.amount, partyId, l.description)), cr(from.value, total, partyId)]);
+    return commit(c, { ...base, dueDate: null, accountId: null, bankAccountId: from.value, status: null }, [...costDr, ...vatLines(c, 'purchase', body.value, 1, partyId), cr(from.value, total, partyId)]);
   }
   const ap = controlAccount(c, 'accounts_payable', input.accountId);
   if (!ap.ok) return ap;
   if (kind === 'bill') {
     const due = dueDateOf(date.value, party.value, input);
     if (!due.ok) return due;
-    return commit(c, { ...base, dueDate: due.value, accountId: ap.value, bankAccountId: null, status: null }, [...lines.map((l) => dr(l.accountId, l.amount, partyId, l.description)), cr(ap.value, total, partyId)]);
+    return commit(c, { ...base, dueDate: due.value, accountId: ap.value, bankAccountId: null, status: null }, [...costDr, ...vatLines(c, 'purchase', body.value, 1, partyId), cr(ap.value, total, partyId)]);
   }
   // vendor credit: we owe less, the cost goes back down
-  return commit(c, { ...base, dueDate: null, accountId: ap.value, bankAccountId: null, status: null }, [dr(ap.value, total, partyId), ...lines.map((l) => cr(l.accountId, l.amount, partyId, l.description))]);
+  return commit(c, { ...base, dueDate: null, accountId: ap.value, bankAccountId: null, status: null }, [dr(ap.value, total, partyId), ...vatLines(c, 'purchase', body.value, -1, partyId), ...costCr]);
 }
 
 // ---------------------------------------------------------------- payments received and bills paid
@@ -405,7 +483,7 @@ export function createSettlement(c: Company, kind: SettlementKind, input: unknow
   const entry = kind === 'payment' ? [dr(money.value, amount, partyId), cr(control.value, amount, partyId)] : [dr(control.value, amount, partyId), cr(money.value, amount, partyId)];
   return commit(
     c,
-    { kind, number: number.value, date: date.value, dueDate: null, partyId, memo: memo.value, lines: [], total: amount, accountId: control.value, bankAccountId: money.value, toAccountId: null, status: null, linkedId: null },
+    { kind, number: number.value, date: date.value, dueDate: null, partyId, memo: memo.value, lines: [], total: amount, taxInclusive: false, refId: null, accountId: control.value, bankAccountId: money.value, toAccountId: null, status: null, linkedId: null },
     entry,
     apps.value,
   );
@@ -445,7 +523,7 @@ export function createTransfer(c: Company, input: unknown): Result<Doc> {
   if (!memo.ok) return memo;
   return commit(
     c,
-    { kind: 'transfer', number: '', date: date.value, dueDate: null, partyId: null, memo: memo.value, lines: [], total: input.amount, accountId: null, bankAccountId: from.value, toAccountId: to.value, status: null, linkedId: null },
+    { kind: 'transfer', number: '', date: date.value, dueDate: null, partyId: null, memo: memo.value, lines: [], total: input.amount, taxInclusive: false, refId: null, accountId: null, bankAccountId: from.value, toAccountId: to.value, status: null, linkedId: null },
     [dr(to.value, input.amount, null), cr(from.value, input.amount, null)],
   );
 }
@@ -459,8 +537,8 @@ export function convertDoc(c: Company, from: 'estimate' | 'purchase_order', inpu
   if (src.voided) return err('doc.void', `${from.replace('_', ' ')} ${src.number} is void.`);
   if (src.status !== 'open') return err('doc.closed', `${from.replace('_', ' ')} ${src.number} is already closed.`);
   // Item lines post to the item's account as it is set up today, as they would on a new invoice.
-  const lines = src.lines.map((l) => ({ itemId: l.itemId, accountId: l.itemId ? undefined : l.accountId, description: l.description, quantity: formatQuantity(l.quantity), rate: l.rate }));
-  const common = { date: input.date ?? src.date, number: input.number, dueDate: input.dueDate, memo: input.memo ?? src.memo, lines };
+  const lines = src.lines.map((l) => ({ itemId: l.itemId, accountId: l.itemId ? undefined : l.accountId, description: l.description, quantity: formatQuantity(l.quantity), rate: l.rate, taxCode: l.taxCode }));
+  const common = { date: input.date ?? src.date, number: input.number, dueDate: input.dueDate, memo: input.memo ?? src.memo, taxInclusive: src.taxInclusive, lines };
   const made =
     from === 'estimate' ? createSalesDoc(c, 'invoice', { ...common, customerId: src.partyId }) : createPurchaseDoc(c, 'bill', { ...common, vendorId: src.partyId });
   if (!made.ok) return made;

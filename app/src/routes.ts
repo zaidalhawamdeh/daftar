@@ -18,9 +18,10 @@ export type ScreenId =
   | 'reports'
   | 'memorized'
   | 'settings'
-  | 'import';
+  | 'import'
+  | 'print';
 
-export const SCREENS: readonly ScreenId[] = ['home', 'accounts', 'customers', 'vendors', 'items', 'docs', 'sales-form', 'purchase-form', 'settle-form', 'apply-credit', 'transfer', 'journal', 'reconcile', 'reports', 'memorized', 'settings', 'import'];
+export const SCREENS: readonly ScreenId[] = ['home', 'accounts', 'customers', 'vendors', 'items', 'docs', 'sales-form', 'purchase-form', 'settle-form', 'apply-credit', 'transfer', 'journal', 'reconcile', 'reports', 'memorized', 'settings', 'import', 'print'];
 
 export interface Target {
   screen: ScreenId;
@@ -83,6 +84,8 @@ export const COMMAND_SCREENS: Record<string, Target> = {
   'report.arAging': report('arAging'),
   'report.apAging': report('apAging'),
   'report.cashFlow': report('cashFlow'),
+  'vat.setup': { screen: 'settings' },
+  'report.vatReturn': report('vatReturn'),
   'memorized.create': { screen: 'memorized' },
   'memorized.list': { screen: 'memorized' },
   'memorized.run': { screen: 'memorized' },
@@ -107,6 +110,7 @@ export const REPORTS = [
   'vendorBalances',
   'openInvoices',
   'unpaidBills',
+  'vatReturn',
 ] as const;
 export type ReportId = (typeof REPORTS)[number];
 

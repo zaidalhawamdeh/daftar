@@ -35,6 +35,11 @@ computer, that works the way small-business bookkeepers already work.
 - **Moving in:** import QuickBooks lists from IIF, opening balances from CSV reports (trial
   balance, open invoices, unpaid bills), and customer, vendor, item and account lists from CSV.
   Transactions in IIF files made by other programs are imported too. Export to IIF.
+- **UAE VAT:** register the company (TRN, emirate, address); standard-rated, zero-rated, exempt,
+  out-of-scope and reverse-charge lines; prices with or without VAT; printable tax invoices and tax
+  credit notes with the particulars of Executive Regulation Article 59; and the VAT 201 return box by
+  box. VAT is worked out per line and rounded to the nearest fils, as the FTA's clarification VATP006
+  describes.
 - **Arabic and English**, right-to-left and left-to-right, light and dark. Three-decimal currencies
   (JOD, KWD, BHD, OMR) are first-class; Arabic digits are accepted in every amount.
 - **Every action is a named command** (press <kbd>Ctrl</kbd>+<kbd>K</kbd>), so anything a person
@@ -50,8 +55,8 @@ computer, that works the way small-business bookkeepers already work.
 People will run real businesses on this, so a wrong number is treated as worse than a missing
 feature. The rules are written down in [`CLAUDE.md`](CLAUDE.md) and checked by tests:
 
-- Money is an integer count of the currency's smallest unit. Nothing is ever a float, and nothing
-  is rounded except quantity × rate, half away from zero, computed with BigInt.
+- Money is an integer count of the currency's smallest unit. Nothing is ever a float, and only two
+  things are rounded, half away from zero with BigInt: quantity × rate, and each line's VAT.
 - Every journal entry balances or is refused. Posted entries are never edited or deleted; mistakes
   are reversed or voided. Closed periods stay closed.
 - Receivables and payables move only through documents, so receivables always equal the customer
@@ -69,7 +74,7 @@ feature. The rules are written down in [`CLAUDE.md`](CLAUDE.md) and checked by t
 - **Integrity check:** `core/integrity.ts` verifies every assumption the core makes; a company file
   must pass it to open, and every random test asserts it.
 
-115 tests run in about three seconds: `npm test`.
+129 tests run in about three seconds: `npm test`.
 
 ## Try it
 
@@ -125,8 +130,10 @@ party balance when both companies use the same fiscal-year start, which IIF does
 
 ## What it does not do yet
 
-Inventory quantities and costing · sales tax / VAT · multiple currencies · payroll · several users
-on one company · bank feeds · budgets · printing invoices to PDF · company address and letterhead ·
+Inventory quantities and costing · VAT outside the UAE · in UAE VAT: imports through customs
+(Boxes 6 and 7), partial or blocked input tax, the profit margin scheme, designated zones and
+electronic invoicing · multiple currencies · payroll · several users on one company · bank feeds ·
+budgets · a logo and letterhead on printed documents ·
 editing a posted invoice or bill (void it and enter it again) · deposit slips and Undeposited Funds
 (create the account, receive payments into it, then transfer) · exporting reports to CSV or Excel
 (they can be printed) · a Frappe Books importer (its file format is defined by AGPL code, which this
@@ -135,14 +142,15 @@ clean-room project does not read).
 The basic chart of accounts includes Inventory, Sales Tax Payable and Payroll Liabilities so a
 chart moved from QuickBooks lines up; the features behind them are not built yet.
 
-The QuickBooks feature list in [`catalog/`](catalog/PARITY.md) (57 of 150 features delivered) was
+The QuickBooks feature list in [`catalog/`](catalog/PARITY.md) (59 of 150 features delivered) was
 drafted from general knowledge of the product and is not yet checked entry by entry against
 Intuit's public help pages.
 
 ## Roadmap
 
-VAT for the UAE and Saudi Arabia (including Saudi e-invoicing) · inventory · multiple currencies ·
-printable invoices and statements · a signed installer, and macOS and Linux packages · several users.
+UAE electronic invoicing (Peppol, PINT AE; mandatory for most businesses from July 2027 under
+Ministerial Decision No. 244 of 2025) · VAT for Saudi Arabia, including its e-invoicing · inventory ·
+multiple currencies · statements · a signed installer, and macOS and Linux packages · several users.
 
 ## Contributing
 

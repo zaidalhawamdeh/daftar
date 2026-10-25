@@ -4,6 +4,7 @@ import type { AccountType } from '../../core/accounts.ts';
 import type { DocKind } from '../../core/documents.ts';
 import { lang, t } from './i18n.ts';
 import { ACCOUNT_TYPES } from '../../core/accounts.ts';
+import { EMIRATE_LABEL, TAX_CODE_LABEL, type Emirate, type TaxCode } from '../../core/vat.ts';
 
 export const DOC_SINGULAR: Record<DocKind, string> = {
   estimate: 'Estimate',
@@ -36,6 +37,8 @@ export const DOC_PLURAL: Record<DocKind, string> = {
 export const docName = (k: DocKind) => t(DOC_SINGULAR[k]);
 export const docsName = (k: DocKind) => t(DOC_PLURAL[k]);
 export const typeName = (k: AccountType) => ACCOUNT_TYPES[k].label[lang()];
+export const taxCodeName = (k: TaxCode) => TAX_CODE_LABEL[k][lang()];
+export const emirateName = (k: Emirate) => EMIRATE_LABEL[k][lang()];
 
 export const REPORT_NAMES: Record<string, { en: string; ar: string }> = {
   profitAndLoss: { en: 'Profit & Loss', ar: 'الأرباح والخسائر' },
@@ -49,6 +52,7 @@ export const REPORT_NAMES: Record<string, { en: string; ar: string }> = {
   vendorBalances: { en: 'Vendor Balances', ar: 'أرصدة الموردين' },
   openInvoices: { en: 'Open Invoices', ar: 'الفواتير المفتوحة' },
   unpaidBills: { en: 'Unpaid Bills', ar: 'فواتير الشراء غير المدفوعة' },
+  vatReturn: { en: 'VAT Return (VAT 201)', ar: 'الإقرار الضريبي (VAT 201)' },
 };
 
 export const reportName = (id: string) => REPORT_NAMES[id]?.[lang()] ?? id;

@@ -57,8 +57,9 @@ export function normalSide(t: AccountType): 'debit' | 'credit' {
   return c === 'asset' || c === 'expense' ? 'debit' : 'credit';
 }
 
-// The one account the system owns: prior years' profit lands here on the balance sheet.
-export type AccountRole = 'retained_earnings';
+// Accounts the system owns: prior years' profit lands in Retained Earnings on the balance sheet, and
+// the two VAT accounts exist once the company is registered for VAT.
+export type AccountRole = 'retained_earnings' | 'vat_output' | 'vat_input';
 
 export interface Account {
   id: string;

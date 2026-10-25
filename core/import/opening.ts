@@ -176,7 +176,7 @@ export function importOpeningBalances(c: Company, input: { date: unknown; trialB
         if (side === 'customer') s.newCustomers++;
         else s.newVendors++;
       }
-      const body = { date: d.date ?? on, dueDate: d.due ?? undefined, number: d.number || undefined, memo: 'Opening balance', accountId: accountFor[k], lines: [{ accountId: obeId, amount: d.amount, description: 'Opening balance' }] };
+      const body = { date: d.date ?? on, dueDate: d.due ?? undefined, number: d.number || undefined, memo: 'Opening balance', accountId: accountFor[k], lines: [{ accountId: obeId, amount: d.amount, description: 'Opening balance', taxCode: c.vat ? 'OS' : undefined }] };
       const made = side === 'customer' ? createSalesDoc(c, 'invoice', { ...body, customerId: party.id }) : createPurchaseDoc(c, 'bill', { ...body, vendorId: party.id });
       if (!made.ok) return err(made.error.code, `${d.name} ${d.number}: ${made.error.message}`);
       if (side === 'customer') s.invoices++;

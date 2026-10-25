@@ -13,6 +13,7 @@ import { MEMORIZABLE } from './memorized.ts';
 import { isMinor } from './money.ts';
 import { lineAmount } from './quantity.ts';
 import { err, ok, type Result } from './result.ts';
+import { EMIRATES, ITEM_TAX_CODES, SALES_KINDS, isTaxCode, isTrn, lineTax, vatAccounts } from './vat.ts';
 
 const LIMIT = 1_000_000_000_000; // counters and ids stay far below 2^53
 const isStr = (v: unknown, max: number, allowEmpty = true): v is string => typeof v === 'string' && v.length <= max && (allowEmpty || v.trim().length > 0);
@@ -63,19 +64,25 @@ export function checkIntegrity(c: Company): Result<true> {
     if (!isInt(c.fiscalYearStartMonth, 1) || c.fiscalYearStartMonth > 12) return no('fiscal year');
     if (c.closingDate !== null && !isIsoDate(c.closingDate)) return no('closing date');
     if (!Array.isArray(c.closingDateLog) || !c.closingDateLog.every((l) => isObj(l) && (l.from === null || isIsoDate(l.from)) && (l.to === null || isIsoDate(l.to)))) return no('closing date log');
+    if (c.vat !== null && (!isObj(c.vat) || !isTrn(c.vat.trn) || !(EMIRATES as readonly unknown[]).includes(c.vat.emirate) || !isStr(c.vat.address, 500, false) || c.currency.code !== 'AED')) return no('VAT settings');
 
     // ---------------------------------------------------------------- accounts
     const acc = c.accounts;
     const numbers = new Set<string>();
     const siblings = new Set<string>();
     let retained = 0;
+    const vatRoles = { vat_output: 0, vat_input: 0 };
     for (const [id, a] of acc) {
       if (!isObj(a) || a.id !== id || !/^acc-\d{1,12}$/.test(id)) return no(`account ${String(id)}`);
       if (!isName(a.name, 100) || a.name.includes(':') || !isStr(a.number, 20) || !isAccountType(a.type) || typeof a.active !== 'boolean') return no(`account ${id}`);
-      if (a.role !== null && a.role !== 'retained_earnings') return no(`account ${id} role`);
-      if (a.role) {
+      if (a.role !== null && a.role !== 'retained_earnings' && a.role !== 'vat_output' && a.role !== 'vat_input') return no(`account ${id} role`);
+      if (a.role === 'retained_earnings') {
         retained++;
         if (a.type !== 'equity' || !a.active) return no('retained earnings account');
+      }
+      if (a.role === 'vat_output' || a.role === 'vat_input') {
+        vatRoles[a.role]++;
+        if (a.type !== (a.role === 'vat_output' ? 'other_current_liability' : 'other_current_asset') || !a.active || a.parentId !== null) return no(`VAT account ${id}`);
       }
       if (a.number) {
         if (numbers.has(a.number)) return no(`account number ${a.number} used twice`);
@@ -90,6 +97,9 @@ export function checkIntegrity(c: Company): Result<true> {
       }
     }
     if (retained !== 1) return no('retained earnings account');
+    // Registration creates both VAT accounts at once and is never undone.
+    if (vatRoles.vat_output > 1 || vatRoles.vat_input > 1 || (c.vat !== null) !== (vatRoles.vat_output === 1 && vatRoles.vat_input === 1)) return no('VAT accounts');
+    const vatAcc = vatAccounts(c);
     for (const a of acc.values()) {
       let depth = 1;
       for (let p = a.parentId; p !== null; p = acc.get(p)!.parentId) {
@@ -105,6 +115,7 @@ export function checkIntegrity(c: Company): Result<true> {
       names.add(p.name.toLowerCase());
       if (![p.companyName, p.email, p.phone].every((s) => isStr(s, 200)) || !isStr(p.address, 500) || !isStr(p.notes, 2000)) return no(`name ${id} details`);
       if (!isInt(p.termsDays) || p.termsDays > 3650 || typeof p.active !== 'boolean') return no(`name ${id} terms`);
+      if (p.trn !== '' && !isTrn(p.trn)) return no(`name ${id} tax number`);
     }
     const itemNames = new Set<string>();
     for (const [id, i] of c.items) {
@@ -112,6 +123,7 @@ export function checkIntegrity(c: Company): Result<true> {
       if (!isName(i.name, 100) || itemNames.has(i.name.toLowerCase()) || !isStr(i.description, 1000)) return no(`item ${id}`);
       itemNames.add(i.name.toLowerCase());
       if (!isMinor(i.price) || i.price < 0 || !isMinor(i.cost) || i.cost < 0 || typeof i.active !== 'boolean') return no(`item ${id} rates`);
+      if (i.taxCode !== null && !(ITEM_TAX_CODES as readonly unknown[]).includes(i.taxCode)) return no(`item ${id} tax code`);
       const s = i.salesAccountId === null ? null : acc.get(i.salesAccountId);
       const pu = i.purchaseAccountId === null ? null : acc.get(i.purchaseAccountId);
       if (s === undefined || pu === undefined || (!s && !pu)) return no(`item ${id} accounts`);
@@ -167,20 +179,39 @@ export function checkIntegrity(c: Company): Result<true> {
       const party = d.partyId === null ? null : c.parties.get(d.partyId);
       if (party === undefined || (rule.required && !party) || (party && party.kind !== rule.kind)) return no(`${what} name`);
       if (!isMinor(d.total) || d.total <= 0) return no(`${what} total`);
-      if (!Array.isArray(d.lines)) return no(`${what} lines`);
+      if (!Array.isArray(d.lines) || typeof d.taxInclusive !== 'boolean') return no(`${what} lines`);
+      if (d.refId !== null) {
+        const r = c.documents.get(d.refId);
+        if (!r || r.kind !== (d.kind === 'credit_memo' ? 'invoice' : d.kind === 'vendor_credit' ? 'bill' : null) || r.partyId !== d.partyId) return no(`${what} reference`);
+      }
+      // What the entry must hold on the VAT accounts: output (credit minus debit) and input (debit
+      // minus credit). Reverse-charge VAT sits on both sides, so the entry's debits exceed the total.
+      const sign = d.kind === 'credit_memo' || d.kind === 'vendor_credit' ? -1 : 1;
+      let vatOut = 0;
+      let vatIn = 0;
+      let reverseCharge = 0;
       if (WITH_LINES.has(d.kind)) {
         if (d.lines.length < 1 || d.lines.length > 500) return no(`${what} lines`);
         let sum = 0;
         for (const l of d.lines) {
           const a = isObj(l) && typeof l.accountId === 'string' ? acc.get(l.accountId) : undefined;
-          if (!a || NOT_ON_LINES.has(a.type) || (l.itemId !== null && !c.items.has(l.itemId)) || !isStr(l.description, 1000)) return no(`${what} line`);
+          if (!a || NOT_ON_LINES.has(a.type) || a.role === 'vat_output' || a.role === 'vat_input' || (l.itemId !== null && !c.items.has(l.itemId)) || !isStr(l.description, 1000)) return no(`${what} line`);
           if (!isInt(l.quantity, 1) || !isMinor(l.rate) || l.rate < 0) return no(`${what} line amount`);
           const amount = lineAmount(l.quantity, l.rate);
           if (!amount.ok || amount.value !== l.amount) return no(`${what} line amount`);
-          sum += l.amount;
+          if (l.taxCode !== null && (!isTaxCode(l.taxCode) || !c.vat || (l.taxCode === 'RC' && SALES_KINDS.has(d.kind)))) return no(`${what} line tax code`);
+          const t = lineTax(l.amount, l.taxCode, d.taxInclusive);
+          if (l.tax !== t.tax) return no(`${what} line VAT`);
+          sum += t.payable;
+          if (l.taxCode === 'SR') (SALES_KINDS.has(d.kind) ? (vatOut += t.tax) : (vatIn += t.tax));
+          if (l.taxCode === 'RC') {
+            vatOut += t.tax;
+            vatIn += t.tax;
+            reverseCharge += t.tax;
+          }
         }
         if (sum !== d.total) return no(`${what} total`);
-      } else if (d.lines.length) return no(`${what} lines`);
+      } else if (d.lines.length || d.taxInclusive || d.refId !== null) return no(`${what} lines`);
       const control = CONTROL[d.kind];
       if (control ? acc.get(d.accountId ?? '')?.type !== control : d.accountId !== null) return no(`${what} account`);
       const money = MONEY[d.kind];
@@ -199,7 +230,9 @@ export function checkIntegrity(c: Company): Result<true> {
       } else {
         const e = d.entryId === null ? undefined : entries.get(d.entryId);
         if (!e || e.source?.kind !== d.kind || e.source.id !== d.id || e.date !== d.date || docOfEntry.has(e.id)) return no(`${what} entry`);
-        if (e.lines.reduce((s, l) => s + l.debit, 0) !== d.total) return no(`${what} total does not match its entry`);
+        if (e.lines.reduce((s, l) => s + l.debit, 0) !== d.total + reverseCharge) return no(`${what} total does not match its entry`);
+        const onVat = (id: string | undefined, debitSide: boolean) => (id === undefined ? 0 : e.lines.reduce((s, l) => s + (l.accountId === id ? (debitSide ? l.debit - l.credit : l.credit - l.debit) : 0), 0));
+        if (onVat(vatAcc?.output, false) !== sign * vatOut || onVat(vatAcc?.input, true) !== sign * vatIn) return no(`${what} VAT does not match its entry`);
         if (d.voided !== reversed.has(e.id)) return no(`${what} void`);
         docOfEntry.set(e.id, d.id);
       }

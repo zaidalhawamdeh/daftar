@@ -69,7 +69,7 @@ export function AmountInput({ c, value, onInput, label }: { c: Company; value: s
 
 const typeOrder = (a: Account, b: Account) => (a.number || '~').localeCompare(b.number || '~', 'en', { numeric: true }) || a.name.localeCompare(b.name);
 
-export function AccountSelect({ c, value, onChange, types, exclude, allowNone, label }: {
+export function AccountSelect({ c, value, onChange, types, exclude, allowNone, label, noVat }: {
   c: Company;
   value: string;
   onChange: (v: string) => void;
@@ -77,8 +77,11 @@ export function AccountSelect({ c, value, onChange, types, exclude, allowNone, l
   exclude?: AccountType[];
   allowNone?: boolean;
   label?: string;
+  noVat?: boolean; // document lines: VAT comes from the tax code, never from a line on a VAT account
 }) {
-  const options = [...c.accounts.values()].filter((a) => a.active && (!types || types.includes(a.type)) && (!exclude || !exclude.includes(a.type))).sort(typeOrder);
+  const options = [...c.accounts.values()]
+    .filter((a) => a.active && (!types || types.includes(a.type)) && (!exclude || !exclude.includes(a.type)) && !(noVat && (a.role === 'vat_output' || a.role === 'vat_input')))
+    .sort(typeOrder);
   return (
     <select value={value} aria-label={label} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
       <option value="">{allowNone ? t('None') : t('Choose…')}</option>

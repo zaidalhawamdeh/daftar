@@ -59,6 +59,7 @@ function PartyForm({ kind, party, onDone }: { kind: PartyKind; party: Party | nu
     phone: party?.phone ?? '',
     email: party?.email ?? '',
     address: party?.address ?? '',
+    trn: party?.trn ?? '',
     termsDays: String(party?.termsDays ?? 0),
     notes: party?.notes ?? '',
   });
@@ -78,6 +79,7 @@ function PartyForm({ kind, party, onDone }: { kind: PartyKind; party: Party | nu
         <Field label={t('Email')}><input type="email" value={f.email} onInput={set('email')} /></Field>
         <Field label={t('Terms (days)')}><input type="number" min="0" value={f.termsDays} onInput={set('termsDays')} /></Field>
         <Field label={t('Address')} wide><input value={f.address} onInput={set('address')} /></Field>
+        <Field label={t('Tax Registration Number (TRN)')}><input value={f.trn} inputMode="numeric" placeholder="100…" onInput={set('trn')} /></Field>
         <Field label={t('Notes')} wide><input value={f.notes} onInput={set('notes')} /></Field>
       </div>
       <ProblemBox p={out.problem} />

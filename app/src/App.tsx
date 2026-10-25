@@ -19,6 +19,7 @@ import { Settle } from './screens/Settle.tsx';
 import { Transfer } from './screens/Transfer.tsx';
 import { Welcome } from './screens/Welcome.tsx';
 import { Import } from './screens/Import.tsx';
+import { PrintDoc } from './screens/PrintDoc.tsx';
 
 export function App() {
   const s = useApp();
@@ -69,6 +70,7 @@ export function App() {
       case 'memorized': return <Memorized c={c} />;
       case 'settings': return <Settings c={c} />;
       case 'import': return <Import c={c} />;
+      case 'print': return <PrintDoc c={c} docId={Number(p.docId)} />;
       default: return <Home c={c} />;
     }
   })();
