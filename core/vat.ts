@@ -52,6 +52,7 @@ export interface VatSettings {
   trn: string; // the Tax Registration Number: 15 digits
   emirate: Emirate;
   address: string; // printed on tax invoices
+  from: string; // effective date of registration: documents dated earlier carry no VAT
 }
 
 export const isTrn = (v: unknown): v is string => typeof v === 'string' && /^\d{15}$/.test(v);
@@ -115,6 +116,8 @@ export interface VatAccounts {
   input: string; // VAT recoverable: input tax on purchases and reverse charge
 }
 
+export const isVatRole = (role: unknown): boolean => role === 'vat_output' || role === 'vat_input';
+
 export function vatAccounts(c: Company): VatAccounts | null {
   let output: string | null = null;
   let input: string | null = null;
@@ -125,7 +128,7 @@ export function vatAccounts(c: Company): VatAccounts | null {
   return output && input ? { output, input } : null;
 }
 
-const VAT_ACCOUNT: Record<'vat_output' | 'vat_input', { number: string; type: AccountType; name: { en: string; ar: string } }> = {
+export const VAT_ACCOUNT: Record<'vat_output' | 'vat_input', { number: string; type: AccountType; name: { en: string; ar: string } }> = {
   vat_output: { number: '2210', type: 'other_current_liability', name: { en: 'VAT Payable (Output)', ar: 'ضريبة القيمة المضافة المستحقة (المخرجات)' } },
   vat_input: { number: '1410', type: 'other_current_asset', name: { en: 'VAT Recoverable (Input)', ar: 'ضريبة القيمة المضافة القابلة للاسترداد (المدخلات)' } },
 };
@@ -140,6 +143,11 @@ export function setupVat(c: Company, input: unknown): Result<VatSettings> {
   if (!isEmirate(input.emirate)) return err('vat.emirate_invalid', 'Choose the emirate where the business is established.');
   const address = cleanName(input.address, 500, 'address');
   if (!address.ok) return err('vat.address_missing', 'The business address is required on tax invoices.');
+  if (!isIsoDate(input.from)) return err('vat.from_invalid', 'Enter the date the registration takes effect.');
+  const from = input.from;
+  // Moving the date later would leave VAT on documents that now predate the registration.
+  const earliest = [...c.documents.values()].filter((d) => d.lines.some((l) => l.taxCode !== null)).reduce<string | null>((m, d) => (m === null || d.date < m ? d.date : m), null);
+  if (earliest !== null && from > earliest) return err('vat.from_after_documents', `Documents from ${earliest} already carry VAT; the registration cannot start after them.`);
   const roles = ['vat_output', 'vat_input'] as const;
   const missing = roles.filter((r) => ![...c.accounts.values()].some((a) => a.role === r));
   for (const r of missing) {
@@ -154,7 +162,7 @@ export function setupVat(c: Company, input: unknown): Result<VatSettings> {
     const id = `acc-${c.nextAccountId++}`;
     c.accounts.set(id, { id, number: taken ? '' : t.number, name: t.name[c.language], type: t.type, parentId: null, active: true, role: r });
   }
-  c.vat = { trn, emirate: input.emirate, address: address.value };
+  c.vat = { trn, emirate: input.emirate, address: address.value, from };
   return ok(c.vat);
 }
 
@@ -181,6 +189,9 @@ export interface VatReturn {
   box13: Minor; // total recoverable tax
   box14: Minor; // payable tax; negative means recoverable
   documents: number[]; // what was counted, for the audit trail
+  // Journal entries on the VAT accounts in the period (a payment to the FTA, a correction). They are
+  // not part of the return; shown so the return and the ledger can be reconciled.
+  otherEntries: { output: Minor; input: Minor };
 }
 
 const zero = (): ReturnBox => ({ amount: 0, vat: 0 });
@@ -227,7 +238,16 @@ export function vatReturn(c: Company, input: unknown): Result<VatReturn> {
   const salesVat = EMIRATES.reduce((s, e) => s + box1[e].vat, 0);
   const box8 = { amount: salesAmount + r.box3.amount + r.box4 + r.box5, vat: salesVat + r.box3.vat };
   const box11 = { amount: r.box9.amount + r.box10.amount, vat: r.box9.vat + r.box10.vat };
-  return ok({ from, to, emirate: c.vat.emirate, box1, ...r, box8, box11, box12: box8.vat, box13: box11.vat, box14: box8.vat - box11.vat, documents: documents.sort((a, b) => a - b) });
+  const accts = vatAccounts(c);
+  const otherEntries = { output: 0, input: 0 };
+  for (const e of c.entries) {
+    if (e.source !== null || e.date < from || e.date > to || !accts) continue;
+    for (const l of e.lines) {
+      if (l.accountId === accts.output) otherEntries.output += l.credit - l.debit;
+      if (l.accountId === accts.input) otherEntries.input += l.debit - l.credit;
+    }
+  }
+  return ok({ from, to, emirate: c.vat.emirate, box1, ...r, box8, box11, box12: box8.vat, box13: box11.vat, box14: box8.vat - box11.vat, documents: documents.sort((a, b) => a - b), otherEntries });
 }
 
 // A standard-rated line's value excluding VAT, whether its price included VAT or not.

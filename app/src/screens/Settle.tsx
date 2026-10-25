@@ -62,7 +62,7 @@ export function Settle({ c, kind }: { c: Company; kind: 'payment' | 'bill_paymen
             <PartySelect c={c} kind={customer ? 'customer' : 'vendor'} value={partyId} onChange={(v) => { setPartyId(v); setApplied({}); }} />
           </Field>
           <Field label={t(customer ? 'Deposit to' : 'Pay from')}>
-            <AccountSelect c={c} value={account} onChange={setAccount} types={customer ? ['bank', 'other_current_asset'] : ['bank', 'credit_card']} />
+            <AccountSelect c={c} value={account} onChange={setAccount} types={customer ? ['bank', 'other_current_asset'] : ['bank', 'credit_card']} noVat />
           </Field>
           <Field label={t('Date')}><DateInput value={date} onInput={setDate} /></Field>
           <Field label={t('Amount')}><AmountInput c={c} value={amount} onInput={setAmount} /></Field>

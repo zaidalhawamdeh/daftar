@@ -12,7 +12,7 @@
    "id": "company.company-information-name-address-tax-id",
    "area": "company",
    "feature": "Company information (name, address, tax ID)",
-   "command": "vat.setup"
+   "command": null
   },
   {
    "id": "company.fiscal-year-start-month",
@@ -816,7 +816,7 @@
    "id": "reports.sales-tax-liability",
    "area": "reports",
    "feature": "Sales tax liability",
-   "command": "report.vatReturn"
+   "command": null
   },
   {
    "id": "reports.transaction-detail-by-account",

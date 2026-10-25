@@ -7,6 +7,7 @@ import { createCompany, findAccount, type Company } from '../company.ts';
 import { exportIif, importIif } from '../import/iif.ts';
 import { checkIntegrity } from '../integrity.ts';
 import { trialBalance } from '../reports.ts';
+import { creditRoom } from '../documents.ts';
 import { lineTax, vatReturn, type VatReturn } from '../vat.ts';
 import { fromText, toText } from '../../store/serialize.ts';
 import { oasis } from './golden/oasis.ts';
@@ -117,20 +118,20 @@ test('line VAT rounds to the nearest fils, half away from zero', () => {
 test('VAT needs dirhams, a 15-digit TRN, an emirate and an address', () => {
   const usd = createCompany({ name: 'US Co', currency: 'USD' });
   assert.ok(usd.ok);
-  assert.equal(code(execute(usd.value, 'vat.setup', { trn: '100123456700003', emirate: 'DU', address: 'Dubai' })), 'vat.currency');
+  assert.equal(code(execute(usd.value, 'vat.setup', { trn: '100123456700003', emirate: 'DU', address: 'Dubai', from: '2026-01-01' })), 'vat.currency');
   const aed = createCompany({ name: 'AE Co', currency: 'AED' });
   assert.ok(aed.ok);
   const c = aed.value;
-  assert.equal(code(execute(c, 'vat.setup', { trn: '12345', emirate: 'DU', address: 'Dubai' })), 'vat.trn_invalid');
-  assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: 'XX', address: 'Dubai' })), 'vat.emirate_invalid');
-  assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: 'DU', address: '  ' })), 'vat.address_missing');
+  assert.equal(code(execute(c, 'vat.setup', { trn: '12345', emirate: 'DU', address: 'Dubai', from: '2026-01-01' })), 'vat.trn_invalid');
+  assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: 'XX', address: 'Dubai', from: '2026-01-01' })), 'vat.emirate_invalid');
+  assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: 'DU', address: '  ', from: '2026-01-01' })), 'vat.address_missing');
   assert.equal(c.vat, null);
-  assert.equal(code(execute(c, 'vat.setup', { trn: '100-1234-5670-0003', emirate: 'AZ', address: 'Abu Dhabi' })), 'ok');
+  assert.equal(code(execute(c, 'vat.setup', { trn: '100-1234-5670-0003', emirate: 'AZ', address: 'Abu Dhabi', from: '2026-01-01' })), 'ok');
   assert.equal(c.vat!.trn, '100123456700003');
   const vatAccounts = [...c.accounts.values()].filter((a) => a.role === 'vat_output' || a.role === 'vat_input');
   assert.equal(vatAccounts.length, 2);
   // Changing the details keeps the same two accounts.
-  assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: 'SH', address: 'Sharjah' })), 'ok');
+  assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: 'SH', address: 'Sharjah', from: '2026-01-01' })), 'ok');
   assert.equal([...c.accounts.values()].filter((a) => a.role === 'vat_output' || a.role === 'vat_input').length, 2);
   assert.equal(code(execute(c, 'account.setActive', { id: vatAccounts[0]!.id, active: false })), 'account.system');
   assert.equal(checkIntegrity(c).ok, true);
@@ -249,18 +250,34 @@ test('IIF round trip of a VAT company keeps every balance', () => {
   assert.deepEqual(byName(fresh.value, '2026-12-31'), byName(c, '2026-12-31'));
 });
 
-test('importing into a VAT company adds no VAT to the imported figures', () => {
+test('importing into a VAT company adds no VAT and keeps every balance, in either language', () => {
   const { c: source } = oasis();
   const text = exportIif(source);
-  const target = createCompany({ name: 'Target', currency: 'AED', template: 'none' });
-  assert.ok(target.ok);
-  // Register first, then import: the imported documents come in as out of scope.
-  const t = target.value;
-  const imported = importIif(t, text);
-  assert.ok(imported.ok);
-  const before = trialBalance(t, '2026-12-31');
-  assert.ok(before.ok);
-  assert.equal(checkIntegrity(t).ok, true);
+  for (const language of ['en', 'ar'] as const) {
+    const target = createCompany({ name: 'Target', currency: 'AED', template: 'none', language });
+    assert.ok(target.ok);
+    const t = target.value;
+    // Register first, then import: documents come in as out of scope, and lines on the source's VAT
+    // accounts land on this company's own VAT accounts through journal entries.
+    assert.equal(code(execute(t, 'vat.setup', { trn: '100123456700003', emirate: 'DU', address: 'Dubai', from: '2026-01-01' })), 'ok');
+    const imported = execute(t, 'import.iif', { text }) as R;
+    assert.ok(imported.ok, imported.ok ? '' : imported.error!.message);
+    assert.equal(checkIntegrity(t).ok, true);
+    const vatAccts = [...t.accounts.values()].filter((a) => /VAT|ضريبة/.test(a.name));
+    assert.equal(vatAccts.length, 2, `${language}: no duplicate VAT accounts`);
+    for (const d of t.documents.values()) for (const l of d.lines) assert.ok(l.taxCode === 'OS' && l.tax === 0);
+    const out = vatAccts.find((a) => a.role === 'vat_output')!;
+    const inp = vatAccts.find((a) => a.role === 'vat_input')!;
+    const bal = trialBalance(t, '2026-09-30');
+    assert.ok(bal.ok);
+    const row = (id: string) => bal.value.rows.find((r) => r.accountId === id)!;
+    assert.equal(row(out.id).credit - row(out.id).debit, 16479);
+    assert.equal(row(inp.id).debit - row(inp.id).credit, 31074);
+    // History imported from another program is not part of this company's return; it shows as other entries.
+    const r = quarter(t, '2026-07-01', '2026-09-30');
+    assert.equal(r.box12, 0);
+    assert.deepEqual(r.otherEntries, { output: 16479, input: 31074 });
+  }
 });
 
 test('property: on random VAT companies the return equals the VAT accounts and integrity holds', () => {
@@ -274,7 +291,7 @@ test('property: on random VAT companies the return equals the VAT accounts and i
     const made = createCompany({ name: `Random ${company}`, currency: 'AED' });
     assert.ok(made.ok);
     const c = made.value;
-    assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: pick(['AZ', 'DU', 'SH', 'AJ', 'UQ', 'RK', 'FU'] as const), address: 'UAE' })), 'ok');
+    assert.equal(code(execute(c, 'vat.setup', { trn: '100123456700003', emirate: pick(['AZ', 'DU', 'SH', 'AJ', 'UQ', 'RK', 'FU'] as const), address: 'UAE', from: '2026-01-01' })), 'ok');
     const cust = (execute(c, 'customer.create', { name: 'C' }) as R).value.id;
     const vend = (execute(c, 'vendor.create', { name: 'V' }) as R).value.id;
     const income = ['4000', '4100', '7000'].map((n) => findAccount(c, n)!.id);
@@ -292,9 +309,17 @@ test('property: on random VAT companies the return equals the VAT accounts and i
       if (kind === 'salesReceipt') p.depositToId = bank;
       if (kind === 'bill' || kind === 'vendorCredit') p.vendorId = vend;
       if (kind === 'expense') p.payFromId = bank;
+      if (kind === 'creditMemo' || kind === 'vendorCredit') {
+        // A credit names an earlier document of the same name and gives a reason.
+        const targets = [...c.documents.values()].filter((d) => d.kind === (kind === 'creditMemo' ? 'invoice' : 'bill') && !d.voided && d.date <= date);
+        if (!targets.length) continue;
+        p.refId = pick(targets).id;
+        p.memo = 'Correction';
+        if (rnd(2) === 0) for (const l of lines) delete (l as Record<string, unknown>).taxCode; // take the codes from the document
+      }
       const r = execute(c, `${kind}.create`, p) as R;
       if (r.ok) made_.push(r.value.id);
-      else assert.ok(['doc.zero_total'].includes(r.error!.code), r.error!.message);
+      else assert.ok(['doc.zero_total', 'doc.credit_over_ref'].includes(r.error!.code), r.error!.message);
       if (made_.length && rnd(10) === 0) execute(c, 'document.void', { docId: pick(made_) });
     }
     const sound = checkIntegrity(c);
@@ -304,7 +329,11 @@ test('property: on random VAT companies the return equals the VAT accounts and i
     assert.equal(r.box12, -(t['2210'] ?? 0), `company ${company}: output`);
     assert.equal(r.box13, t['1410'] ?? 0, `company ${company}: input`);
     assert.equal(r.box14, r.box12 - r.box13);
-    // Every document's VAT is the sum of its lines' VAT, each a whole fils.
-    for (const d of c.documents.values()) for (const l of d.lines) assert.ok(Number.isInteger(l.tax) && l.tax >= 0);
+    // Each line's VAT is a whole, non-negative number of fils, and no credit takes back more than
+    // its document holds at any tax code.
+    for (const d of c.documents.values()) {
+      for (const l of d.lines) assert.ok(Number.isInteger(l.tax) && l.tax >= 0);
+      if (d.refId !== null && !c.documents.get(d.refId)!.voided) for (const left of creditRoom(c, c.documents.get(d.refId)!).values()) assert.ok(left >= 0, `credits over document ${d.refId}`);
+    }
   }
 });

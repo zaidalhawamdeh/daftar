@@ -9,8 +9,9 @@ internet needed.
 
 ![Home](docs/images/home.png)
 
-> **Status: early.** The accounting core is complete for a service business and heavily tested;
-> inventory, sales tax, multiple currencies and payroll are not built yet (see [Roadmap](#roadmap)).
+> **Status: early.** The accounting core is complete for a service business and heavily tested,
+> with UAE VAT; inventory, other countries' taxes, multiple currencies and payroll are not built yet
+> (see [Roadmap](#roadmap)).
 > Read the [limits](#what-it-does-not-do-yet) before trusting it with real books.
 
 ## Why
@@ -35,11 +36,15 @@ computer, that works the way small-business bookkeepers already work.
 - **Moving in:** import QuickBooks lists from IIF, opening balances from CSV reports (trial
   balance, open invoices, unpaid bills), and customer, vendor, item and account lists from CSV.
   Transactions in IIF files made by other programs are imported too. Export to IIF.
-- **UAE VAT:** register the company (TRN, emirate, address); standard-rated, zero-rated, exempt,
-  out-of-scope and reverse-charge lines; prices with or without VAT; printable tax invoices and tax
-  credit notes with the particulars of Executive Regulation Article 59; and the VAT 201 return box by
-  box. VAT is worked out per line and rounded to the nearest fils, as the FTA's clarification VATP006
-  describes.
+- **UAE VAT:** register the company (TRN, emirate, address, effective date); standard-rated,
+  zero-rated, exempt, out-of-scope and reverse-charge lines; prices with or without VAT; printable
+  tax invoices (Executive Regulation Article 59) and tax credit notes that name the invoice they
+  correct and give the reason (Article 60); and the VAT 201 return box by box. VAT is worked out per
+  line and rounded to the nearest fils, as the FTA's clarification VATP006 describes. After filing,
+  one click closes the books through the end of the period, so nothing can change what was filed.
+  Assumptions: the date of supply is the document date; no discounts; standard-rated sales go under
+  the emirate currently set (the business's establishment); VAT on purchases is worked out per line,
+  so it can differ by a fils from a supplier's document that rounds on the total.
 - **Arabic and English**, right-to-left and left-to-right, light and dark. Three-decimal currencies
   (JOD, KWD, BHD, OMR) are first-class; Arabic digits are accepted in every amount.
 - **Every action is a named command** (press <kbd>Ctrl</kbd>+<kbd>K</kbd>), so anything a person
@@ -71,10 +76,12 @@ feature. The rules are written down in [`CLAUDE.md`](CLAUDE.md) and checked by t
 - **Adversarial review:** after each milestone a separate agent tried to break the numbers. Every
   confirmed finding was fixed; those in the accounting core each have a regression test
   (`core/test/refuted*.test.ts`), and interface fixes were checked in the browser.
-- **Integrity check:** `core/integrity.ts` verifies every assumption the core makes; a company file
-  must pass it to open, and every random test asserts it.
+- **Integrity check:** `core/integrity.ts` verifies every assumption the core makes, including that
+  each document's entry is exactly what the document posts, line by line. A company file must pass
+  it to open, every command is checked against it before its change is kept, and every random test
+  asserts it.
 
-129 tests run in about five seconds: `npm test`.
+138 tests run in about six seconds: `npm test`.
 
 ## Try it
 
@@ -131,8 +138,9 @@ party balance when both companies use the same fiscal-year start, which IIF does
 ## What it does not do yet
 
 Inventory quantities and costing · VAT outside the UAE · in UAE VAT: imports through customs
-(Boxes 6 and 7), partial or blocked input tax, the profit margin scheme, designated zones and
-electronic invoicing · multiple currencies · payroll · several users on one company · bank feeds ·
+(Boxes 6 and 7), partial or blocked input tax, zero-rated services received under the reverse
+charge, supplies where the customer accounts for the VAT, the profit margin scheme, designated
+zones, a change of emirate between periods, and electronic invoicing · multiple currencies · payroll · several users on one company · bank feeds ·
 budgets · a logo and letterhead on printed documents ·
 editing a posted invoice or bill (void it and enter it again) · deposit slips and Undeposited Funds
 (create the account, receive payments into it, then transfer) · exporting reports to CSV or Excel
@@ -142,7 +150,7 @@ clean-room project does not read).
 The basic chart of accounts includes Inventory, Sales Tax Payable and Payroll Liabilities so a
 chart moved from QuickBooks lines up; the features behind them are not built yet.
 
-The QuickBooks feature list in [`catalog/`](catalog/PARITY.md) (59 of 150 features delivered) was
+The QuickBooks feature list in [`catalog/`](catalog/PARITY.md) (57 of 150 features delivered) was
 drafted from general knowledge of the product and is not yet checked entry by entry against
 Intuit's public help pages.
 

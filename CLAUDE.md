@@ -13,8 +13,11 @@ People will run real businesses on this. A wrong number is worse than a missing 
   line's VAT (`core/vat.ts`, per the UAE Executive Regulation Art. 61 and FTA clarification VATP006:
   per line, to the nearest fils). Nothing else is ever rounded.
 - **VAT comes from tax codes, never from a line on a VAT account.** A document's entry holds exactly
-  the VAT its lines compute; reverse-charge VAT sits on both the output and the input account. The
-  integrity check recomputes every line's VAT and the VAT lines of every entry.
+  the VAT its lines compute; reverse-charge VAT sits on both the output and the input account. VAT
+  accounts are top-level, childless, and never receive or pay money directly.
+- **Every document's entry is rebuilt from the document** (`postingFor`) when it is posted and again
+  by the integrity check, which compares them line by line. `execute` runs the integrity check after
+  every change and undoes a change that fails it, so no command can leave a company that will not open.
 - **Every journal entry balances** (sum of debits = sum of credits, per currency) or is rejected.
 - **Reports are derived from posted entries only.** No stored balance that can drift.
 - **Posted entries are never edited or deleted.** Corrections are reversing entries.

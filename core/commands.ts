@@ -24,6 +24,7 @@ import { aging, openInvoices, partyBalances, unpaidBills } from './subledger.ts'
 import { exportIif, importIif } from './import/iif.ts';
 import { importList, importOpeningBalances } from './import/opening.ts';
 import { setupVat, vatReturn } from './vat.ts';
+import { checkIntegrity } from './integrity.ts';
 
 export interface CommandSpec {
   id: string;
@@ -237,6 +238,15 @@ export function execute(c: Company, id: string, params: unknown = {}): Result<un
     if (!r.ok) {
       if (before) Object.assign(c, before);
       return r;
+    }
+    // The books are checked after every change: a state the company could not be opened from again is
+    // never kept, whatever path led to it.
+    if (before) {
+      const sound = checkIntegrity(c);
+      if (!sound.ok) {
+        Object.assign(c, before);
+        return err('internal.integrity', 'That change would leave the books inconsistent; nothing was changed.', { command: id, what: sound.error.details?.what });
+      }
     }
     // Callers get a copy: nothing they do to a result can reach the books.
     return { ok: true, value: structuredClone(r.value) };

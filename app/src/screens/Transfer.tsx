@@ -28,8 +28,8 @@ export function Transfer({ c }: { c: Company }) {
       </div>
       <form class="card" onSubmit={save}>
         <div class="fields">
-          <Field label={t('From account')}><AccountSelect c={c} value={fromId} onChange={setFrom} types={[...MONEY]} /></Field>
-          <Field label={t('To account')}><AccountSelect c={c} value={toId} onChange={setTo} types={[...MONEY]} /></Field>
+          <Field label={t('From account')}><AccountSelect c={c} value={fromId} onChange={setFrom} types={[...MONEY]} noVat /></Field>
+          <Field label={t('To account')}><AccountSelect c={c} value={toId} onChange={setTo} types={[...MONEY]} noVat /></Field>
           <Field label={t('Date')}><DateInput value={date} onInput={setDate} /></Field>
           <Field label={t('Amount')}><AmountInput c={c} value={amount} onInput={setAmount} /></Field>
           <Field label={t('Memo')} wide><input value={memo} onInput={(e) => setMemo((e.target as HTMLInputElement).value)} /></Field>

@@ -85,7 +85,7 @@ function ItemForm({ c, item, onDone }: { c: Company; item: Item | null; onDone: 
         <Field label={t('Cost')}><AmountInput c={c} value={cost} onInput={setCost} /></Field>
         <Field label={t('Purchase account')}><AccountSelect c={c} value={purchaseAccountId} onChange={setPurchase} exclude={['accounts_receivable', 'accounts_payable']} allowNone noVat /></Field>
         {c.vat && (
-          <Field label={t('VAT')}>
+          <Field label={t('VAT on sales')}>
             <select value={taxCode} onChange={(e) => setTaxCode((e.target as HTMLSelectElement).value as TaxCode | '')}>
               <option value="">{taxCodeName('SR')}</option>
               {ITEM_TAX_CODES.filter((k) => k !== 'SR').map((k) => <option key={k} value={k}>{taxCodeName(k)}</option>)}

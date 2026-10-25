@@ -205,6 +205,7 @@ function checkParent(c: Company, v: unknown, type: AccountType, selfId: string |
   const parent = c.accounts.get(v);
   if (!parent) return err('account.parent_missing', 'Parent account does not exist.');
   if (!parent.active) return err('account.parent_inactive', `Parent "${parent.name}" is inactive.`);
+  if (parent.role === 'vat_output' || parent.role === 'vat_input') return err('account.parent_vat', `"${parent.name}" is a VAT account and has no sub-accounts.`);
   if (classOf(parent.type) !== classOf(type)) {
     return err('account.parent_class', `A ${ACCOUNT_TYPES[type].label.en} account cannot sit under "${parent.name}".`);
   }
@@ -271,6 +272,7 @@ export function updateAccount(c: Company, id: unknown, input: AccountInput): Res
   if (!number.ok) return number;
   const parentId = input.parentId === undefined ? ok(a.parentId) : checkParent(c, input.parentId, type, a.id);
   if (!parentId.ok) return parentId;
+  if ((a.role === 'vat_output' || a.role === 'vat_input') && parentId.value !== a.parentId) return err('account.system', `"${a.name}" is managed by the system and stays a top-level account.`);
   if (input.parentId === undefined && input.type !== undefined && a.parentId) {
     const p = c.accounts.get(a.parentId);
     if (p && classOf(p.type) !== classOf(type)) return err('account.parent_class', 'Parent is a different kind of account.');

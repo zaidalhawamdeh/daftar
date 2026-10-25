@@ -13,7 +13,8 @@ import { MEMORIZABLE } from './memorized.ts';
 import { isMinor } from './money.ts';
 import { lineAmount } from './quantity.ts';
 import { err, ok, type Result } from './result.ts';
-import { EMIRATES, ITEM_TAX_CODES, SALES_KINDS, isTaxCode, isTrn, lineTax, vatAccounts } from './vat.ts';
+import { EMIRATES, ITEM_TAX_CODES, SALES_KINDS, isTaxCode, isTrn, isVatRole, lineTax, vatAccounts } from './vat.ts';
+import { postingFor } from './documents.ts';
 
 const LIMIT = 1_000_000_000_000; // counters and ids stay far below 2^53
 const isStr = (v: unknown, max: number, allowEmpty = true): v is string => typeof v === 'string' && v.length <= max && (allowEmpty || v.trim().length > 0);
@@ -64,7 +65,7 @@ export function checkIntegrity(c: Company): Result<true> {
     if (!isInt(c.fiscalYearStartMonth, 1) || c.fiscalYearStartMonth > 12) return no('fiscal year');
     if (c.closingDate !== null && !isIsoDate(c.closingDate)) return no('closing date');
     if (!Array.isArray(c.closingDateLog) || !c.closingDateLog.every((l) => isObj(l) && (l.from === null || isIsoDate(l.from)) && (l.to === null || isIsoDate(l.to)))) return no('closing date log');
-    if (c.vat !== null && (!isObj(c.vat) || !isTrn(c.vat.trn) || !(EMIRATES as readonly unknown[]).includes(c.vat.emirate) || !isStr(c.vat.address, 500, false) || c.currency.code !== 'AED')) return no('VAT settings');
+    if (c.vat !== null && (!isObj(c.vat) || !isTrn(c.vat.trn) || !(EMIRATES as readonly unknown[]).includes(c.vat.emirate) || !isStr(c.vat.address, 500, false) || !isIsoDate(c.vat.from) || c.currency.code !== 'AED')) return no('VAT settings');
 
     // ---------------------------------------------------------------- accounts
     const acc = c.accounts;
@@ -93,7 +94,7 @@ export function checkIntegrity(c: Company): Result<true> {
       siblings.add(sib);
       if (a.parentId !== null) {
         const p = typeof a.parentId === 'string' ? acc.get(a.parentId) : undefined;
-        if (!p || classOf(p.type) !== classOf(a.type)) return no(`account ${id} parent`);
+        if (!p || classOf(p.type) !== classOf(a.type) || isVatRole(p.role)) return no(`account ${id} parent`);
       }
     }
     if (retained !== 1) return no('retained earnings account');
@@ -199,7 +200,7 @@ export function checkIntegrity(c: Company): Result<true> {
           if (!isInt(l.quantity, 1) || !isMinor(l.rate) || l.rate < 0) return no(`${what} line amount`);
           const amount = lineAmount(l.quantity, l.rate);
           if (!amount.ok || amount.value !== l.amount) return no(`${what} line amount`);
-          if (l.taxCode !== null && (!isTaxCode(l.taxCode) || !c.vat || (l.taxCode === 'RC' && SALES_KINDS.has(d.kind)))) return no(`${what} line tax code`);
+          if (l.taxCode !== null && (!isTaxCode(l.taxCode) || !c.vat || d.date < c.vat.from || (l.taxCode === 'RC' && SALES_KINDS.has(d.kind)))) return no(`${what} line tax code`);
           const t = lineTax(l.amount, l.taxCode, d.taxInclusive);
           if (l.tax !== t.tax) return no(`${what} line VAT`);
           sum += t.payable;
@@ -211,6 +212,7 @@ export function checkIntegrity(c: Company): Result<true> {
           }
         }
         if (sum !== d.total) return no(`${what} total`);
+        if (d.taxInclusive && (!c.vat || d.date < c.vat.from)) return no(`${what} prices include VAT without registration`);
       } else if (d.lines.length || d.taxInclusive || d.refId !== null) return no(`${what} lines`);
       const control = CONTROL[d.kind];
       if (control ? acc.get(d.accountId ?? '')?.type !== control : d.accountId !== null) return no(`${what} account`);
@@ -231,6 +233,13 @@ export function checkIntegrity(c: Company): Result<true> {
         const e = d.entryId === null ? undefined : entries.get(d.entryId);
         if (!e || e.source?.kind !== d.kind || e.source.id !== d.id || e.date !== d.date || docOfEntry.has(e.id)) return no(`${what} entry`);
         if (e.lines.reduce((s, l) => s + l.debit, 0) !== d.total + reverseCharge) return no(`${what} total does not match its entry`);
+        // The entry is exactly what the document posts, line by line: nothing moved to another account.
+        const expected = postingFor(c, d).filter((l) => l.debit > 0 || l.credit > 0);
+        const original = e.reverses === null ? e : undefined;
+        if (!original || original.lines.length !== expected.length || !expected.every((x, i) => {
+          const l = original.lines[i]!;
+          return l.accountId === x.accountId && l.debit === x.debit && l.credit === x.credit && l.partyId === x.partyId;
+        })) return no(`${what} entry does not match the document`);
         const onVat = (id: string | undefined, debitSide: boolean) => (id === undefined ? 0 : e.lines.reduce((s, l) => s + (l.accountId === id ? (debitSide ? l.debit - l.credit : l.credit - l.debit) : 0), 0));
         if (onVat(vatAcc?.output, false) !== sign * vatOut || onVat(vatAcc?.input, true) !== sign * vatIn) return no(`${what} VAT does not match its entry`);
         if (d.voided !== reversed.has(e.id)) return no(`${what} void`);

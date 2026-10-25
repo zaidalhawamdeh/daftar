@@ -8,6 +8,7 @@
 
 import { classOf, type Account, type AccountType } from '../accounts.ts';
 import { createAccount, findAccount, retainedEarnings, type Company } from '../company.ts';
+import { VAT_ACCOUNT, isVatRole } from '../vat.ts';
 import { applyCredit, createPurchaseDoc, createSalesDoc, createSettlement, createTransfer, openBalance, unapplied, type Doc } from '../documents.ts';
 import { createItem } from '../items.ts';
 import { postEntry } from '../journal.ts';
@@ -149,6 +150,17 @@ export function importIif(c: Company, text: unknown, opts: { autoApply?: boolean
       const re = retainedEarnings(c);
       byPath.set(path.toLowerCase(), re.id);
       return ok(re.id);
+    }
+    // Another Daftar company's VAT accounts, in either language, are this company's own.
+    if (parts.length === 1) {
+      for (const role of ['vat_output', 'vat_input'] as const) {
+        const own = [...c.accounts.values()].find((a) => a.role === role);
+        const n = VAT_ACCOUNT[role].name;
+        if (own && classOf(own.type) === classOf(type) && [n.en, n.ar].some((x) => x.toLowerCase() === parts[0]!.toLowerCase())) {
+          byPath.set(path.toLowerCase(), own.id);
+          return ok(own.id);
+        }
+      }
     }
     let parentId: string | null = null;
     if (parts.length > 1) {
@@ -349,7 +361,9 @@ type Count = (kind: string) => void;
 // so the caller takes the generic route instead.
 function mapped(c: Company, type: string, lines: Line[], h: { date: string; number: string; memo: string; due: string | null }, count: Count, renumbered: () => void): Result<boolean> {
   const [head, ...rest] = lines as [Line, ...Line[]];
-  const plain = rest.every((l) => !isControl(l.type));
+  // A line on a VAT account cannot be a document line (VAT comes from tax codes): such a transaction
+  // takes the generic route, where it becomes a journal entry on the VAT account.
+  const plain = rest.every((l) => !isControl(l.type) && !isVatRole(c.accounts.get(l.accountId)?.role));
   const docLines = (sign: 1 | -1) => rest.map((l) => ({ accountId: l.accountId, amount: sign * l.amount, description: l.memo, taxCode: c.vat ? 'OS' : undefined }));
   const restSign = (sign: 1 | -1) => rest.every((l) => sign * l.amount > 0);
   // A number already in use (QuickBooks allows repeats) gets the next free one; the count is reported.

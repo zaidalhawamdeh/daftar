@@ -90,7 +90,7 @@ function AccountForm({ c, account, onDone }: { c: Company; account: Account | nu
           </select>
         </Field>
         <Field label={t('Parent account')}>
-          <AccountSelect c={c} value={parentId} onChange={setParentId} types={sameClass} allowNone />
+          {account?.role === 'vat_output' || account?.role === 'vat_input' ? <input value={t('None')} disabled /> : <AccountSelect c={c} value={parentId} onChange={setParentId} types={sameClass} allowNone noVat />}
         </Field>
       </div>
       <ProblemBox p={out.problem} />

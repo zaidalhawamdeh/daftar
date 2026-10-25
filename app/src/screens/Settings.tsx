@@ -117,8 +117,9 @@ function VatSettings({ c }: { c: Company }) {
   const [trn, setTrn] = useState(c.vat?.trn ?? '');
   const [emirate, setEmirate] = useState<Emirate | ''>(c.vat?.emirate ?? '');
   const [address, setAddress] = useState(c.vat?.address ?? '');
+  const [from, setFrom] = useState(c.vat?.from ?? '');
   const save = () => {
-    const r = run('vat.setup', { trn, emirate, address });
+    const r = run('vat.setup', { trn, emirate, address, from });
     if (!r.ok) return out.fail(r.error);
     out.succeed('✓');
   };
@@ -139,6 +140,7 @@ function VatSettings({ c }: { c: Company }) {
                   {EMIRATES.map((e) => <option key={e} value={e}>{emirateName(e)}</option>)}
                 </select>
               </Field>
+              <Field label={t('Registered from')}><DateInput value={from} onInput={setFrom} /></Field>
               <Field label={t('Address on tax invoices')} wide><input value={address} onInput={(e) => setAddress((e.target as HTMLInputElement).value)} /></Field>
             </div>
             <button class="primary" onClick={save}>{c.vat ? t('Save VAT details') : t('Register for VAT')}</button>

@@ -267,7 +267,30 @@ function VatReturnTable({ c, r }: { c: Company; r: VatReturn }) {
           {row('14', r.box14 >= 0 ? L('Payable tax for the period', 'الضريبة المستحقة الدفع عن الفترة') : L('Recoverable tax for the period (refund or carry forward)', 'الضريبة القابلة للاسترداد عن الفترة (استرداد أو ترحيل)'), null, r.box14, true)}
         </tbody>
       </table></div>
+      {(r.otherEntries.output !== 0 || r.otherEntries.input !== 0) && (
+        <p class="muted" style={{ marginTop: 'var(--s3)' }}>
+          {L('Journal entries on the VAT accounts in this period, not part of the return (a payment to the FTA, a correction): output', 'قيود يومية على حسابات الضريبة في هذه الفترة، ليست جزءاً من الإقرار (دفعة للهيئة، تصحيح): المخرجات')} <Money c={c} value={r.otherEntries.output} /> · {L('input', 'المدخلات')} <Money c={c} value={r.otherEntries.input} />
+        </p>
+      )}
+      <FileReturn c={c} to={r.to} />
       <p class="muted" style={{ marginTop: 'var(--s3)' }}>{L(`${r.documents.length} documents counted, by document date. Check the figures before filing; not modelled: imports through customs, partial or blocked input tax, the profit margin scheme and designated zones.`, `احتُسبت ${r.documents.length} مستندات حسب تاريخها. راجع الأرقام قبل التقديم؛ لا يشمل التقرير: الاستيراد عبر الجمارك، والاسترداد الجزئي أو المحظور لضريبة المدخلات، ونظام هامش الربح، والمناطق المحددة.`)}</p>
     </>
+  );
+}
+
+// After the return is filed, close the books through the end of the period, so nothing dated in it can
+// change what was filed (corrections then go in a later return, as the FTA expects).
+function FileReturn({ c, to }: { c: Company; to: string }) {
+  const done = c.closingDate !== null && c.closingDate >= to;
+  return (
+    <div class="row no-print" style={{ marginTop: 'var(--s3)' }}>
+      {done ? (
+        <span class="notice">{L(`The books are closed through ${c.closingDate}; this period can no longer change.`, `الدفاتر مقفلة حتى ${c.closingDate}؛ هذه الفترة لم تعد تتغيّر.`)}</span>
+      ) : (
+        <button onClick={() => { const r = run('company.setClosingDate', { date: to }); if (!r.ok) alert(r.error.message); }}>
+          {L(`Filed this return? Close the books through ${to}`, `قدّمت هذا الإقرار؟ أقفل الدفاتر حتى ${to}`)}
+        </button>
+      )}
+    </div>
   );
 }

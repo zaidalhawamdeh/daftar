@@ -26,7 +26,7 @@ export function oasis(): Oasis {
   const acct = (n: string) => findAccount(c, n)!.id;
   const live = (id: number) => c.documents.get(id)!;
 
-  run('vat.setup', { trn: '100123456700003', emirate: 'DU', address: 'Office 1204, Al Fahidi Street, Bur Dubai, Dubai' });
+  run('vat.setup', { trn: '100123456700003', emirate: 'DU', address: 'Office 1204, Al Fahidi Street, Bur Dubai, Dubai', from: '2026-07-01' });
   run('journal.post', { date: '2026-07-01', memo: 'Capital', lines: [{ accountId: acct('1010'), debit: 1000000 }, { accountId: acct('3000'), credit: 1000000 }] });
 
   const noor = run<{ id: string }>('customer.create', { name: 'Al Noor Trading', trn: '100987654300003', address: 'Deira, Dubai', termsDays: 30 }).id;

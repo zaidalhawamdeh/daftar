@@ -15,9 +15,13 @@ import { Money } from '../ui.tsx';
 
 const L = (en: string, ar: string) => (lang() === 'ar' ? ar : en);
 
+// A tax invoice or tax credit note is for a taxable supply (standard or zero-rated) by a registrant;
+// documents from before the registration, or wholly exempt or out of scope, are plain invoices.
+const taxable = (d: Doc) => d.lines.some((l) => l.taxCode === 'SR' || l.taxCode === 'ZR');
+
 function title(c: Company, d: Doc): [string, string] {
-  if (c.vat && (d.kind === 'invoice' || d.kind === 'sales_receipt')) return ['Tax Invoice', 'فاتورة ضريبية'];
-  if (c.vat && d.kind === 'credit_memo') return ['Tax Credit Note', 'إشعار دائن ضريبي'];
+  if (c.vat && taxable(d) && (d.kind === 'invoice' || d.kind === 'sales_receipt')) return ['Tax Invoice', 'فاتورة ضريبية'];
+  if (c.vat && taxable(d) && d.kind === 'credit_memo') return ['Tax Credit Note', 'إشعار دائن ضريبي'];
   if (d.kind === 'estimate') return ['Quotation', 'عرض سعر'];
   return [docName(d.kind), docName(d.kind)];
 }
@@ -33,6 +37,10 @@ export function PrintDoc({ c, docId }: { c: Company; docId: number }) {
   const vatOn = !!c.vat && d.lines.some((l) => l.taxCode !== null);
   const ref = d.refId !== null ? c.documents.get(d.refId) : undefined;
   const refNet = ref ? docTax(ref).net : 0;
+  // Earlier credits against the same invoice already lowered its value (Art. 60(1)(e)).
+  const before = ref ? [...c.documents.values()].filter((x) => x.refId === ref.id && !x.voided && x.id !== d.id && (x.date < d.date || (x.date === d.date && x.id < d.id))).reduce((s, x) => s + docTax(x).net, 0) : 0;
+  const isTax = title(c, d)[0].startsWith('Tax');
+  const missingAddress = isTax && !!party?.trn && !party.address;
   return (
     <div class="print-doc">
       <div class="row no-print" style={{ marginBottom: 'var(--s4)' }}>
@@ -40,6 +48,7 @@ export function PrintDoc({ c, docId }: { c: Company; docId: number }) {
         <button onClick={() => go('docs', { kind: d.kind })}>{t('Cancel')}</button>
         <span class="muted">{L('Choose "Save as PDF" in the print window to keep a PDF.', 'اختر «حفظ بصيغة PDF» من نافذة الطباعة لحفظ نسخة PDF.')}</span>
       </div>
+      {missingAddress && <div class="problem no-print" role="alert">{L('The customer is registered for VAT: a tax invoice must show their address. Add it in the customer list.', 'الزبون مسجّل في الضريبة: الفاتورة الضريبية يجب أن تذكر عنوانه. أضفه في قائمة الزبائن.')}</div>}
       <div class="sheet">
         <header class="sheet-head">
           <div>
@@ -63,9 +72,9 @@ export function PrintDoc({ c, docId }: { c: Company; docId: number }) {
           <table class="sheet-facts">
             <tbody>
               <tr><td class="muted">{L('Number', 'الرقم')}</td><td><bdi class="num">{d.number}</bdi></td></tr>
-              <tr><td class="muted">{L('Date of issue', 'تاريخ الإصدار')}</td><td class="num">{d.date}</td></tr>
-              {d.dueDate && d.kind === 'invoice' && <tr><td class="muted">{L('Due date', 'تاريخ الاستحقاق')}</td><td class="num">{d.dueDate}</td></tr>}
-              {d.dueDate && d.kind === 'estimate' && <tr><td class="muted">{L('Valid until', 'صالح حتى')}</td><td class="num">{d.dueDate}</td></tr>}
+              <tr><td class="muted">{L('Date of issue', 'تاريخ الإصدار')}</td><td><bdi class="num">{d.date}</bdi></td></tr>
+              {d.dueDate && d.kind === 'invoice' && <tr><td class="muted">{L('Due date', 'تاريخ الاستحقاق')}</td><td><bdi class="num">{d.dueDate}</bdi></td></tr>}
+              {d.dueDate && d.kind === 'estimate' && <tr><td class="muted">{L('Valid until', 'صالح حتى')}</td><td><bdi class="num">{d.dueDate}</bdi></td></tr>}
               <tr><td class="muted">{L('Currency', 'العملة')}</td><td>{c.currency.code}</td></tr>
             </tbody>
           </table>
@@ -79,7 +88,8 @@ export function PrintDoc({ c, docId }: { c: Company; docId: number }) {
                 <table class="sheet-facts">
                   <tbody>
                     <tr><td class="muted">{L('Value on the tax invoice', 'القيمة في الفاتورة الضريبية')}</td><td class="n"><Money c={c} value={refNet} /></td></tr>
-                    <tr><td class="muted">{L('Correct value', 'القيمة الصحيحة')}</td><td class="n"><Money c={c} value={refNet - sums.net} /></td></tr>
+                    {before > 0 && <tr><td class="muted">{L('Earlier tax credit notes', 'إشعارات دائنة سابقة')}</td><td class="n"><Money c={c} value={-before} /></td></tr>}
+                    <tr><td class="muted">{L('Correct value', 'القيمة الصحيحة')}</td><td class="n"><Money c={c} value={refNet - before - sums.net} /></td></tr>
                     <tr><td class="muted">{L('Difference', 'الفرق')}</td><td class="n"><Money c={c} value={sums.net} /></td></tr>
                     {vatOn && <tr><td class="muted">{L('VAT on the difference', 'الضريبة على الفرق')}</td><td class="n"><Money c={c} value={sums.vat} /></td></tr>}
                   </tbody>

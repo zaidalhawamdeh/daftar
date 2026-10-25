@@ -44,6 +44,14 @@ function next(date: string, f: Frequency, anchorDay: number | null): string {
   }
 }
 
+// A template saved without tax codes (before the company registered for VAT) would quietly gain 5% on
+// every line once registered. It is refused instead; memorize it again with its tax codes.
+function untaxed(c: Company, m: { name: string; params: Record<string, unknown> }, date: string): Result<true> {
+  if (!c.vat || date < c.vat.from || !Array.isArray(m.params.lines)) return ok(true);
+  const missing = (m.params.lines as unknown[]).some((l) => isObject(l) && (l.taxCode === undefined || l.taxCode === null || l.taxCode === ''));
+  return missing ? err('memorized.no_tax_codes', `"${m.name}" has no tax codes; memorize it again with its tax codes.`) : ok(true);
+}
+
 export function createMemorized(c: Company, runner: Runner, input: unknown): Result<Memorized> {
   if (!isObject(input)) return err('memorized.invalid', 'Details are missing.');
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -79,6 +87,8 @@ export function createMemorized(c: Company, runner: Runner, input: unknown): Res
       endDate = input.endDate;
     }
   }
+  const tax = untaxed(c, { name, params }, nextDate ?? (typeof input.trialDate === 'string' ? input.trialDate : '9999-12-31'));
+  if (!tax.ok) return tax;
   // Check the transaction itself, on a copy, so a broken template is refused now rather than later.
   const trial = runner.dryRun(input.command, { ...params, date: nextDate ?? input.trialDate ?? '2000-01-01' });
   if (!trial.ok) return err('memorized.template', `The saved transaction is not valid: ${trial.error.message}`, { cause: trial.error.code });
@@ -103,6 +113,8 @@ export function runMemorized(c: Company, runner: Runner, input: unknown): Result
   const m = typeof input.id === 'string' ? c.memorized.get(input.id) : undefined;
   if (!m) return err('memorized.missing', 'That memorized transaction does not exist.');
   if (!isIsoDate(input.date)) return err('date.invalid', 'Choose the date to enter it on.');
+  const tax = untaxed(c, m, input.date);
+  if (!tax.ok) return tax;
   return runner.run(m.command, { ...structuredClone(m.params), date: input.date });
 }
 
@@ -116,6 +128,8 @@ export function runDue(c: Company, runner: Runner, input: unknown): Result<{ mem
   for (const m of due) {
     while (m.nextDate && m.nextDate <= asOf && (m.endDate === null || m.nextDate <= m.endDate)) {
       if (made.length >= MAX_RUNS) return err('memorized.too_many', `More than ${MAX_RUNS} occurrences are due; run the schedule in smaller steps.`);
+      const tax = untaxed(c, m, m.nextDate);
+      if (!tax.ok) return err('memorized.run_failed', `"${m.name}" on ${m.nextDate}: ${tax.error.message}`, { memorizedId: m.id, date: m.nextDate, cause: tax.error.code });
       const r = runner.run(m.command, { ...structuredClone(m.params), date: m.nextDate });
       if (!r.ok) return err('memorized.run_failed', `"${m.name}" on ${m.nextDate}: ${r.error.message}`, { memorizedId: m.id, date: m.nextDate, cause: r.error.code });
       made.push({ memorizedId: m.id, date: m.nextDate, result: r.value });

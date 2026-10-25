@@ -42,7 +42,7 @@ interface LineRow {
   description: string;
   quantity: string;
   rate: string;
-  taxCode: TaxCode;
+  taxCode: TaxCode | null; // null: the line follows a referenced document that carried no VAT
 }
 
 const blank = (): LineRow => ({ itemId: '', accountId: '', description: '', quantity: '1', rate: '', taxCode: 'SR' });
@@ -60,16 +60,24 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
   const [memorizing, setMemorizing] = useState(false);
   const [inclusive, setInclusive] = useState(false);
   const [refId, setRefId] = useState('');
-  const vatOn = c.vat !== null;
+  const vatOn = c.vat !== null && date >= c.vat.from; // documents before the registration carry no VAT
   const codes = cfg.side === 'sales' ? ITEM_TAX_CODES : TAX_CODES;
   const refKind = kind === 'credit_memo' ? 'invoice' : kind === 'vendor_credit' ? 'bill' : null;
-  const refs = refKind ? [...c.documents.values()].filter((d) => d.kind === refKind && !d.voided && d.partyId === partyId).sort((a, b) => b.date.localeCompare(a.date)) : [];
+  const refs = refKind ? [...c.documents.values()].filter((d) => d.kind === refKind && !d.voided && d.partyId === partyId && d.date <= date).sort((a, b) => b.date.localeCompare(a.date)) : [];
+  // Choosing the document a credit corrects gives its lines that document's tax code, when it has one.
+  const pickRef = (v: string) => {
+    setRefId(v);
+    const ref = v ? c.documents.get(Number(v)) : undefined;
+    const codes = ref ? [...new Set(ref.lines.map((l) => l.taxCode))] : [];
+    if (codes.length === 1) setLines(lines.map((l) => ({ ...l, taxCode: codes[0]! })));
+    else if (!ref) setLines(lines.map((l) => (l.taxCode === null ? { ...l, taxCode: 'SR' } : l)));
+  };
 
   const setLine = (i: number, patch: Partial<LineRow>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const pickItem = (i: number, itemId: string) => {
     const item = c.items.get(itemId);
     const rate = item ? (cfg.side === 'sales' ? item.price : item.cost) : 0;
-    setLine(i, { itemId, description: item?.description ?? lines[i]!.description, rate: item ? (rate ? formatAmount(rate, c.currency, { grouping: false }) : '') : lines[i]!.rate, taxCode: item?.taxCode ?? lines[i]!.taxCode });
+    setLine(i, { itemId, description: item?.description ?? lines[i]!.description, rate: item ? (rate ? formatAmount(rate, c.currency, { grouping: false }) : '') : lines[i]!.rate, taxCode: item ? (cfg.side === 'sales' ? (item.taxCode ?? 'SR') : 'SR') : lines[i]!.taxCode });
   };
   // A blank rate on an item line means the item's own price, exactly as the core will post it.
   const rateOf = (l: LineRow): number | null => {
@@ -89,7 +97,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
   const taxOf = (l: LineRow) => lineTax(amountOf(l) ?? 0, vatOn ? l.taxCode : null, inclusive);
   const sums = used.reduce((s, l) => {
     const x = taxOf(l);
-    return { net: s.net + x.net, vat: s.vat + (l.taxCode === 'SR' ? x.tax : 0), rc: s.rc + (l.taxCode === 'RC' ? x.tax : 0), total: s.total + x.payable };
+    return { net: s.net + x.net, vat: s.vat + (vatOn && l.taxCode === 'SR' ? x.tax : 0), rc: s.rc + (vatOn && l.taxCode === 'RC' ? x.tax : 0), total: s.total + x.payable };
   }, { net: 0, vat: 0, rc: 0, total: 0 });
   const total = sums.total;
 
@@ -105,7 +113,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
         out.fail({ code: 'amount.invalid', message: `"${l.rate}" is not an amount.` });
         return null;
       }
-      built.push({ ...(l.itemId ? { itemId: l.itemId } : { accountId: l.accountId }), description: l.description, quantity: l.quantity || '1', ...(rate !== null ? { rate } : {}), ...(vatOn ? { taxCode: l.taxCode } : {}) });
+      built.push({ ...(l.itemId ? { itemId: l.itemId } : { accountId: l.accountId }), description: l.description, quantity: l.quantity || '1', ...(rate !== null ? { rate } : {}), ...(vatOn && l.taxCode !== null ? { taxCode: l.taxCode } : {}) });
     }
     return {
       ...(cfg.side === 'sales' ? { customerId: partyId || null } : { vendorId: partyId || null }),
@@ -115,7 +123,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
       ...(cfg.expires && dueDate ? { expiresOn: dueDate } : {}),
       ...(cfg.money ? { [cfg.money]: moneyAccount } : {}),
       memo,
-      ...(vatOn ? { taxInclusive: inclusive } : {}),
+      ...(vatOn && inclusive ? { taxInclusive: true } : {}),
       ...(refKind && refId ? { refId: Number(refId) } : {}),
       lines: built,
     };
@@ -147,7 +155,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
           </Field>
           {cfg.money && (
             <Field label={t(cfg.money === 'depositToId' ? 'Deposit to' : 'Pay from')}>
-              <AccountSelect c={c} value={moneyAccount} onChange={setMoneyAccount} types={cfg.money === 'depositToId' ? ['bank', 'other_current_asset'] : ['bank', 'credit_card']} />
+              <AccountSelect c={c} value={moneyAccount} onChange={setMoneyAccount} types={cfg.money === 'depositToId' ? ['bank', 'other_current_asset'] : ['bank', 'credit_card']} noVat />
             </Field>
           )}
           <Field label={t('Date')}><DateInput value={date} onInput={setDate} /></Field>
@@ -155,7 +163,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
           {(cfg.due || cfg.expires) && <Field label={t('Due date')}><DateInput value={dueDate} onInput={setDueDate} /></Field>}
           {refKind && (
             <Field label={t(refKind === 'invoice' ? 'For invoice' : 'For bill')}>
-              <select value={refId} onChange={(e) => setRefId((e.target as HTMLSelectElement).value)}>
+              <select value={refId} onChange={(e) => pickRef((e.target as HTMLSelectElement).value)}>
                 <option value="">{t('None')}</option>
                 {refs.map((d) => <option key={d.id} value={d.id}>{`${d.number || '—'} · ${d.date} · ${formatAmount(d.total, c.currency)}`}</option>)}
               </select>
@@ -201,9 +209,13 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
                     <td><AmountInput c={c} value={l.rate} label={t('Rate')} onInput={(v) => setLine(i, { rate: v })} /></td>
                     {vatOn && (
                       <td>
-                        <select value={l.taxCode} aria-label={t('VAT')} onChange={(e) => setLine(i, { taxCode: (e.target as HTMLSelectElement).value as TaxCode })}>
-                          {codes.map((code) => <option key={code} value={code}>{taxCodeName(code)}</option>)}
-                        </select>
+                        {l.taxCode === null ? (
+                          <span class="muted">{t('No VAT')}</span>
+                        ) : (
+                          <select value={l.taxCode} aria-label={t('VAT')} onChange={(e) => setLine(i, { taxCode: (e.target as HTMLSelectElement).value as TaxCode })}>
+                            {codes.map((code) => <option key={code} value={code}>{taxCodeName(code)}</option>)}
+                          </select>
+                        )}
                       </td>
                     )}
                     <td class="n">{a !== null && (l.itemId || l.accountId) ? <Money c={c} value={a} /> : l.rate.trim() || l.itemId ? <span class="neg">?</span> : ''}</td>
@@ -230,7 +242,7 @@ export function DocForm({ c, kind, partyId: initialParty }: { c: Company; kind: 
         </div>
 
         <div class="fields" style={{ marginTop: 'var(--s3)' }}>
-          <Field label={t('Memo')} wide><input value={memo} onInput={(e) => setMemo((e.target as HTMLInputElement).value)} /></Field>
+          <Field label={t(kind === 'credit_memo' && vatOn ? 'Reason for the credit' : 'Memo')} wide><input value={memo} onInput={(e) => setMemo((e.target as HTMLInputElement).value)} /></Field>
         </div>
         <ProblemBox p={out.problem} />
         {out.notice && <div class="notice" role="status">{out.notice}</div>}
